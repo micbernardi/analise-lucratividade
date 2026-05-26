@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SUPERA · Rentabilidade & Desempenho</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=Archivo+Narrow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="hdr">
+  <div class="brand">
+    <div class="logo-supera">
+      <span class="logo-sup">supera</span>
+      <span class="logo-farm">farma</span>
+    </div>
+    <div class="brand-divider"></div>
+    <div>
+      <h1>Dashboard Rentabilidade & Desempenho</h1>
+      <p>JAN–ABR 2026</p>
+    </div>
+  </div>
+  <div class="hcounts">
+    <div class="hc"><div class="hc-v" id="h-tot" style="color:var(--muted2)">—</div><div class="hc-l">Setores</div></div>
+    <div class="hc"><div class="hc-v" style="color:var(--green)" id="h-s">—</div><div class="hc-l">Saudável</div></div>
+    <div class="hc"><div class="hc-v" style="color:var(--yellow)" id="h-a">—</div><div class="hc-l">Atenção</div></div>
+    <div class="hc"><div class="hc-v" style="color:var(--red)" id="h-c">—</div><div class="hc-l">Crítico</div></div>
+    <button class="btn-upload" onclick="openUpload()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 10V3M5 6l3-3 3 3M3 12h10"/></svg>
+      Planilhas
+    </button>
+  </div>
+</div>
+
+<!-- FILTERS -->
+<div class="fbar">
+  <div class="fg"><label>Regional</label>
+    <select id="f-reg" onchange="onRegChange()"><option value="">Todas</option></select></div>
+  <div class="fg"><label>Distrital</label>
+    <select id="f-dist" onchange="applyFilters()"><option value="">Todas</option></select></div>
+  <div class="fsep"></div>
+  <div class="fg"><label>Meses neg.</label>
+    <select id="f-neg" onchange="applyFilters()">
+      <option value="">Todos</option><option value="1">≥ 1</option>
+      <option value="2">≥ 2</option><option value="3">≥ 3</option><option value="4">4 meses</option>
+    </select></div>
+  <div class="fg"><label>Share YTD</label>
+    <select id="f-share" onchange="applyFilters()">
+      <option value="">Todos</option>
+      <option value="beat">Ganhou share</option><option value="miss">Perdeu share</option>
+    </select></div>
+  <div class="fsep"></div>
+  <div class="fg"><label>Buscar</label>
+    <input type="text" id="f-search" placeholder="Nome ou código..." oninput="applyFilters()"></div>
+  <div class="ctabs">
+    <button class="ctab t-all" onclick="setTab('',this)">Todos</button>
+    <button class="ctab" onclick="setTab('Saudável',this)"><span class="d6 s"></span>Saudável</button>
+    <button class="ctab" onclick="setTab('Atenção',this)"><span class="d6 a"></span>Atenção</button>
+    <button class="ctab" onclick="setTab('Crítico',this)"><span class="d6 c"></span>Crítico</button>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- KPI CARDS — sticky wrapper -->
+  <div class="kpis-wrap">
+    <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:5px">
+      <button class="btn-legend" onclick="openLegend()">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="7"/><path d="M8 7v5M8 5v.5"/></svg>
+        O que significa cada card?
+      </button>
+    </div>
+    <div class="kpis">
+      <div class="kpi ks" id="ki-s" onclick="kpiClick('Saudável','ki-s')">
+        <div class="kv" style="color:var(--green)" id="kv-s">—</div>
+        <div class="kl">Saudável</div><div class="ks2">Luc. positiva e/ou crescendo</div>
+        <div class="khint">Filtrar ↓</div>
+      </div>
+      <div class="kpi ka_" id="ki-a" onclick="kpiClick('Atenção','ki-a')">
+        <div class="kv" style="color:var(--yellow)" id="kv-a">—</div>
+        <div class="kl">Atenção Recuperando</div><div class="ks2">Negativos com sinais de melhora</div>
+        <div class="khint">Filtrar ↓</div>
+      </div>
+      <div class="kpi kn" id="ki-ns" onclick="kpiClick('neg_sem_melhora','ki-ns')">
+        <div class="kv" style="color:var(--orange)" id="kv-ns">—</div>
+        <div class="kl">Neg. Sem Melhora</div><div class="ks2">Neg. consecutivo e perdendo share</div>
+        <div class="khint">Filtrar ↓</div>
+      </div>
+      <div class="kpi kc" id="ki-c" onclick="kpiClick('Crítico','ki-c')">
+        <div class="kv" style="color:#7f1d1d" id="kv-c">—</div>
+        <div class="kl" style="color:#991b1b">Crítico</div><div class="ks2" style="color:#b91c1c">Sem recuperação clara</div>
+        <div class="khint">Filtrar ↓</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACTIVE FILTER BANNER -->
+  <div class="afb" id="afb">
+    Filtrando por: <b id="afb-lbl">—</b>
+    <button class="afb-clear" onclick="clearKpi()">✕ Limpar filtro</button>
+  </div>
+
+  <!-- LEGEND + MONTH SEL -->
+  <div class="legrow">
+    <span style="color:var(--muted);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Classificação:</span>
+    <span class="li"><span class="d6 s"></span>Saudável</span>
+    <span class="li"><span class="d6 a"></span>Atenção</span>
+    <span class="li"><span class="d6 c"></span>Crítico</span>
+    <span style="color:var(--muted);font-size:9px">⭐ negativo mas vende acima do mercado &nbsp;|&nbsp; <b style="color:var(--orange)">Neg. Sem Melhora</b> = negativo em MAR e ABR + perdendo share YTD</span>
+    <div style="display:flex;align-items:center;gap:6px;padding:3px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px">
+      <span style="font-size:9px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em" id="lbl-consolidada">Luc. Brasil ABR</span>
+      <span id="kv-med" style="font-family:var(--ff);font-weight:800;font-size:14px;color:var(--green)">—</span>
+    </div>
+    <div class="msel">
+      <span>Ver luc.:</span>
+      <button class="mb" onclick="setVM('JAN')">JAN</button>
+      <button class="mb" onclick="setVM('FEV')">FEV</button>
+      <button class="mb" onclick="setVM('MAR')">MAR</button>
+      <button class="mb ma" onclick="setVM('ABR')">ABR</button>
+    </div>
+  </div>
+
+  <!-- NO DATA STATE -->
+  <div class="no-data-banner" id="no-data">
+    <div style="font-size:40px">📂</div>
+    <h3>Nenhuma planilha carregada</h3>
+    <p>Clique em <strong>Planilhas</strong> no canto superior direito para fazer o upload das planilhas de lucratividade e desempenho.</p>
+    <button class="btn btn-primary" onclick="openUpload()">Carregar planilhas</button>
+  </div>
+
+  <!-- TABLE -->
+  <div class="twrap" id="twrap" style="display:none">
+    <div class="thdr">
+      <h2>Setores</h2>
+      <span class="tcnt" id="tcnt">—</span>
+    </div>
+    <table>
+      <thead>
+        <!-- row 1: group labels -->
+        <tr class="thead-groups">
+          <th colspan="4" class="tg-base"></th>
+          <th colspan="1" class="tg-vm">Venda</th>
+          <th colspan="3" class="tg-ytd gs-ytd">▸ YTD Acumulado</th>
+          <th colspan="3" class="tg-mes gs-mes">▸ Mês <span id="tg-mes-label">ABR</span></th>
+        </tr>
+        <!-- row 2: column names -->
+        <tr>
+          <th class="c-setor" onclick="sortBy('nome')">Setor <span class="si">↕</span></th>
+          <th class="c-hier" onclick="sortBy('hier')">Regional / Distrital <span class="si">↕</span></th>
+          <th class="c-class" onclick="sortBy('classificacao')">Classif. <span class="si">↕</span></th>
+          <th class="c-luc ns" id="th-luc">Luc. <span id="th-mes" style="color:#93c5fd;font-weight:800">ABR</span> / YTD</th>
+          <th class="c-vm sup-col" onclick="sortBy('venda_media')">Média Mensal <span class="si">↕</span></th>
+          <th class="c-sytd sup-col gs-ytd" onclick="sortBy('ytd_sup_var')">Var. Supera% <span class="si">↕</span></th>
+          <th class="c-mytd" onclick="sortBy('ytd_merc_var')">Var. Mercado% <span class="si">↕</span></th>
+          <th class="c-shytd sh-col" onclick="sortBy('ytd_share_var')">Var. Share <span class="si">↕</span></th>
+          <th class="c-sabr sup-col gs-mes" onclick="sortBy('abrabr_sup_var')">Var. Supera% <span class="si">↕</span></th>
+          <th class="c-mabr" onclick="sortBy('abrabr_merc_var')">Var. Mercado% <span class="si">↕</span></th>
+          <th class="c-shabr sh-col" onclick="sortBy('abrabr_share_var')">Var. Share <span class="si">↕</span></th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div class="pag" id="pag"></div>
+  </div>
+</div>
+
+<!-- UPLOAD PANEL -->
+<div class="upload-overlay" id="upload-overlay" onclick="closeUploadIfBg(event)">
+  <div class="upload-panel">
+    <h2>Planilhas de Dados</h2>
+    <p>Faça o upload das planilhas para atualizar o dashboard. Os dados ficam salvos no navegador.</p>
+    <div class="upload-panel-body">
+    <div style="background:#f0f6ff;border:1px solid #c7d9f5;border-radius:10px;padding:12px 14px;margin-bottom:18px;font-size:12px;color:#2d4a7a;line-height:1.7">
+      <div style="font-weight:800;font-size:12px;margin-bottom:6px;display:flex;align-items:center;gap:6px">
+        📅 Fluxo mensal de atualização
+      </div>
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;align-items:baseline">
+        <span style="font-weight:700;color:#1e3a5f">1º acesso</span>
+        <span>Suba todas as lucratividades disponíveis (ex: JAN a ABR) + desempenho do mês mais recente.</span>
+        <span style="font-weight:700;color:#1e3a5f">Novo mês</span>
+        <span>Clique em <b>Limpar dados salvos</b>, adicione a nova lucratividade (ex: MAI) junto com as anteriores + novo desempenho. O dashboard detecta o mês automaticamente pelo nome das abas.</span>
+        <span style="font-weight:700;color:#1e3a5f">Desempenho</span>
+        <span>Sempre 1 arquivo — o mais atual. Substitua a cada mês.</span>
+        <span style="font-weight:700;color:#1e3a5f">Lucratividade</span>
+        <span>1 arquivo por mês (JAN a DEZ). Acumule — não precisa remover os anteriores.</span>
+      </div>
+    </div>
+
+    <div class="upload-section">
+      <h3>Lucratividade — 1 arquivo por mês (JAN a DEZ)</h3>
+      <div class="file-list" id="luc-list"></div>
+      <div class="file-drop" id="luc-drop" onclick="document.getElementById('luc-input').click()"
+           ondragover="dragOver(event,'luc-drop')" ondragleave="dragLeave('luc-drop')" ondrop="dropFiles(event,'luc')">
+        <input type="file" id="luc-input" multiple accept=".xlsx" onchange="addFiles(this.files,'luc')">
+        ＋ Clique ou arraste arquivos XLSX de lucratividade
+      </div>
+    </div>
+
+    <div class="upload-section">
+      <h3>Desempenho — 1 arquivo atualizado</h3>
+      <div class="file-list" id="desemp-list"></div>
+      <div class="file-drop" id="desemp-drop" onclick="document.getElementById('desemp-input').click()"
+           ondragover="dragOver(event,'desemp-drop')" ondragleave="dragLeave('desemp-drop')" ondrop="dropFiles(event,'desemp')">
+        <input type="file" id="desemp-input" accept=".xlsx" onchange="addFiles(this.files,'desemp')">
+        ＋ Clique ou arraste o arquivo XLSX de desempenho
+      </div>
+    </div>
+
+    </div><!-- /upload-panel-body -->
+    <div class="upload-progress" id="upload-progress">
+      <div class="spinner"></div>
+      <span id="progress-msg">Processando planilhas…</span>
+    </div>
+
+    <div class="upload-actions">
+      <button class="btn btn-danger" id="btn-clear" onclick="clearAllData()">🗑 Limpar dados salvos</button>
+      <button class="btn btn-ghost" onclick="closeUpload()">Cancelar</button>
+      <button class="btn btn-primary" id="btn-process" onclick="processFiles()" disabled>Processar e salvar</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- LEGEND MODAL -->
+<div class="legend-modal-overlay" id="legend-overlay" onclick="closeLegendIfBg(event)">
+  <div class="legend-modal">
+    <h2>
+      📋 O que significa cada card?
+      <button class="legend-modal-close" onclick="closeLegend()">×</button>
+    </h2>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:var(--green)"></div>
+      <div class="legend-content">
+        <h3 style="color:var(--green)">Saudável</h3>
+        <p>Setores com lucratividade positiva no mês mais recente, ou com tendência de melhora consistente.</p>
+        <code>luc ≥ 5%  |  luc ≥ 0% e tendência ↑</code>
+      </div>
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:var(--yellow)"></div>
+      <div class="legend-content">
+        <h3 style="color:var(--yellow)">Atenção Recuperando</h3>
+        <p>Setores com lucratividade negativa, mas com sinais claros de recuperação: tendência de melhora, ganho de share de mercado ou poucos meses negativos.</p>
+        <code>luc &lt; 0  e  (tendência ↑  |  ganhando share  |  ≤ 3 meses neg.)</code>
+      </div>
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:var(--orange)"></div>
+      <div class="legend-content">
+        <h3 style="color:var(--orange)">Neg. Sem Melhora</h3>
+        <p>Alerta transversal — setores que estão negativos nos dois meses mais recentes (MAR e ABR) <strong>e</strong> perdendo share de mercado no acumulado YTD. Subconjunto de Atenção e Crítico.</p>
+        <code>luc_ABR &lt; 0  e  luc_MAR &lt; 0  e  share_ytd ≤ 0</code>
+      </div>
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:var(--red)"></div>
+      <div class="legend-content">
+        <h3 style="color:var(--red)">Crítico</h3>
+        <p>Setores com lucratividade negativa e sem nenhum sinal de recuperação: tendência de piora, perdendo share e múltiplos meses consecutivos no negativo.</p>
+        <code>luc &lt; 0  e  sem tendência positiva  e  sem ganho de share</code>
+      </div>
+    </div>
+    <div style="margin-top:14px;padding:10px 12px;background:var(--surface2);border-radius:8px;font-size:11px;color:var(--muted2);line-height:1.6">
+      💡 <strong>Dica:</strong> Clique em qualquer card para filtrar a tabela. A lucratividade consolidada na barra de legenda muda conforme o filtro de Regional ou Distrital selecionado.
+    </div>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
