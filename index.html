@@ -132,11 +132,8 @@
 
   <!-- TABLE -->
   <div class="twrap" id="twrap" style="display:none">
-    <div class="thdr">
-      <h2>Setores</h2>
-      <span class="tcnt" id="tcnt">—</span>
-    </div>
-    <table>
+    <div class="thdr"><h2>Setores</h2><span class="tcnt" id="tcnt">—</span></div>
+    <div class="tscroll" id="tscroll"><table>
       <thead>
         <!-- row 1: group labels -->
         <tr class="thead-groups">
@@ -162,6 +159,7 @@
       </thead>
       <tbody id="tbody"></tbody>
     </table>
+    </table></div>
     <div class="pag" id="pag"></div>
   </div>
 </div>
@@ -171,44 +169,57 @@
   <div class="upload-panel">
     <h2>Planilhas de Dados</h2>
     <p>Faça o upload das planilhas para atualizar o dashboard. Os dados ficam salvos no navegador.</p>
-    <div class="upload-panel-body">
-    <div style="background:#f0f6ff;border:1px solid #c7d9f5;border-radius:10px;padding:12px 14px;margin-bottom:18px;font-size:12px;color:#2d4a7a;line-height:1.7">
-      <div style="font-weight:800;font-size:12px;margin-bottom:6px;display:flex;align-items:center;gap:6px">
-        📅 Fluxo mensal de atualização
-      </div>
-      <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;align-items:baseline">
-        <span style="font-weight:700;color:#1e3a5f">1º acesso</span>
-        <span>Suba todas as lucratividades disponíveis (ex: JAN a ABR) + desempenho do mês mais recente.</span>
-        <span style="font-weight:700;color:#1e3a5f">Novo mês</span>
-        <span>Clique em <b>Limpar dados salvos</b>, adicione a nova lucratividade (ex: MAI) junto com as anteriores + novo desempenho. O dashboard detecta o mês automaticamente pelo nome das abas.</span>
-        <span style="font-weight:700;color:#1e3a5f">Desempenho</span>
-        <span>Sempre 1 arquivo — o mais atual. Substitua a cada mês.</span>
-        <span style="font-weight:700;color:#1e3a5f">Lucratividade</span>
-        <span>1 arquivo por mês (JAN a DEZ). Acumule — não precisa remover os anteriores.</span>
-      </div>
+    <!-- Instrução compacta -->
+    <div style="background:#f0f6ff;border:1px solid #c7d9f5;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:11px;color:#2d4a7a;line-height:1.6">
+      <span style="font-weight:800">📅 Fluxo mensal:</span>
+      &nbsp;No primeiro acesso suba todas as lucratividades + desempenho atual. A cada novo mês, clique em
+      <b>Limpar dados salvos</b>, adicione a nova lucratividade junto com as anteriores e o desempenho atualizado.
     </div>
 
-    <div class="upload-section">
-      <h3>Lucratividade — 1 arquivo por mês (JAN a DEZ)</h3>
-      <div class="file-list" id="luc-list"></div>
-      <div class="file-drop" id="luc-drop" onclick="document.getElementById('luc-input').click()"
-           ondragover="dragOver(event,'luc-drop')" ondragleave="dragLeave('luc-drop')" ondrop="dropFiles(event,'luc')">
-        <input type="file" id="luc-input" multiple accept=".xlsx" onchange="addFiles(this.files,'luc')">
-        ＋ Clique ou arraste arquivos XLSX de lucratividade
-      </div>
-    </div>
+    <!-- Dois painéis lado a lado -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:4px;align-items:start">
 
-    <div class="upload-section">
-      <h3>Desempenho — 1 arquivo atualizado</h3>
-      <div class="file-list" id="desemp-list"></div>
-      <div class="file-drop" id="desemp-drop" onclick="document.getElementById('desemp-input').click()"
-           ondragover="dragOver(event,'desemp-drop')" ondragleave="dragLeave('desemp-drop')" ondrop="dropFiles(event,'desemp')">
-        <input type="file" id="desemp-input" accept=".xlsx" onchange="addFiles(this.files,'desemp')">
-        ＋ Clique ou arraste o arquivo XLSX de desempenho
+      <!-- Lucratividade -->
+      <div style="border:2px solid #c7d9f5;border-radius:10px;padding:14px;background:#f8fbff">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <div style="width:28px;height:28px;border-radius:7px;background:#1e3a5f;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2"><rect x="2" y="1" width="10" height="14" rx="1.5"/><path d="M5 5h6M5 8h6M5 11h4"/></svg>
+          </div>
+          <div>
+            <div style="font-weight:800;font-size:12px;color:#1e3a5f">Lucratividade</div>
+            <div style="font-size:10px;color:#5a7a9a">1 arquivo por mês · acumule JAN a DEZ</div>
+          </div>
+        </div>
+        <div class="file-list" id="luc-list" style="margin-bottom:8px"></div>
+        <div class="file-drop" id="luc-drop" onclick="document.getElementById('luc-input').click()"
+             ondragover="dragOver(event,'luc-drop')" ondragleave="dragLeave('luc-drop')" ondrop="dropFiles(event,'luc')"
+             style="font-size:11px;padding:12px">
+          <input type="file" id="luc-input" multiple accept=".xlsx" onchange="addFiles(this.files,'luc')">
+          ＋ Clique ou arraste os XLSX de lucratividade
+        </div>
       </div>
-    </div>
 
-    </div><!-- /upload-panel-body -->
+      <!-- Desempenho -->
+      <div style="border:2px solid #c8e6c9;border-radius:10px;padding:14px;background:#f8fff8">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <div style="width:28px;height:28px;border-radius:7px;background:#1a5c2a;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2"><path d="M2 12l4-4 3 3 5-6"/></svg>
+          </div>
+          <div>
+            <div style="font-weight:800;font-size:12px;color:#1a5c2a">Desempenho</div>
+            <div style="font-size:10px;color:#4a7a5a">1 arquivo · sempre o mais recente</div>
+          </div>
+        </div>
+        <div class="file-list" id="desemp-list" style="margin-bottom:8px"></div>
+        <div class="file-drop" id="desemp-drop" onclick="document.getElementById('desemp-input').click()"
+             ondragover="dragOver(event,'desemp-drop')" ondragleave="dragLeave('desemp-drop')" ondrop="dropFiles(event,'desemp')"
+             style="font-size:11px;padding:12px;border-color:#a5d6a7">
+          <input type="file" id="desemp-input" accept=".xlsx" onchange="addFiles(this.files,'desemp')">
+          ＋ Clique ou arraste o XLSX de desempenho
+        </div>
+      </div>
+
+    </div>
     <div class="upload-progress" id="upload-progress">
       <div class="spinner"></div>
       <span id="progress-msg">Processando planilhas…</span>
