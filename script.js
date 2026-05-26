@@ -154,7 +154,8 @@ function kpiClick(f, id) {
   };
   document.getElementById('afb-lbl').textContent = labels[f] || f;
   document.getElementById('afb').classList.add('show');
-  applyFilters(); // just update data, no scroll
+  applyFilters();
+  setTimeout(updateStickyTop, 50); // just update data, no scroll
 }
 
 function clearKpi() {
@@ -162,6 +163,7 @@ function clearKpi() {
   document.querySelectorAll('.kpi').forEach(k => k.classList.remove('ka'));
   document.getElementById('afb').classList.remove('show');
   applyFilters();
+  setTimeout(updateStickyTop, 50);
 }
 
 function getBase() {
@@ -324,6 +326,9 @@ function renderTable() {
     </tr>`;
   }).join('');
   renderPag();
+  // Rebuild clone when table re-renders
+  theadCloneBuilt = false;
+  setTimeout(updateStickyTop, 50);
 }
 
 function renderPag() {
@@ -352,18 +357,34 @@ function goPage(p) {
 
 // ── STICKY THEAD TOP — recalculate dynamically ────────────────────────────────
 function updateStickyTop() {
-  const hdrH   = document.querySelector('.hdr').offsetHeight;
-  const fbarH  = document.querySelector('.fbar').offsetHeight;
-  const kpisH  = document.querySelector('.kpis-wrap').offsetHeight;
-  const top    = hdrH + fbarH + kpisH;
-  document.querySelectorAll('thead th').forEach(th => th.style.top = top + 'px');
-  // Update fbar top
-  document.querySelector('.fbar').style.top = hdrH + 'px';
-  // Update kpis-wrap top
-  document.querySelector('.kpis-wrap').style.top = (hdrH + fbarH) + 'px';
+  const hdr  = document.querySelector('.hdr');
+  const fbar = document.querySelector('.fbar');
+  const kpis = document.querySelector('.kpis-wrap');
+  if (!hdr || !fbar) return;
+
+  const hdrH  = hdr.offsetHeight;
+  const fbarH = fbar.offsetHeight;
+  const kpisH = kpis ? kpis.offsetHeight : 0;
+  const theadTop = hdrH + fbarH + kpisH;
+
+  // Update sticky tops
+  fbar.style.top = hdrH + 'px';
+  if (kpis) kpis.style.top = (hdrH + fbarH) + 'px';
+
+  // Thead rows stick below header + filters + kpis
+  document.querySelectorAll('thead tr.thead-groups th').forEach(th => {
+    th.style.top = theadTop + 'px';
+  });
+  // Get height of groups row for second row offset
+  const groupsRow = document.querySelector('thead tr.thead-groups');
+  const groupsH = groupsRow ? groupsRow.offsetHeight : 26;
+  document.querySelectorAll('thead tr:not(.thead-groups) th').forEach(th => {
+    th.style.top = (theadTop + groupsH) + 'px';
+  });
 }
 window.addEventListener('load', updateStickyTop);
 window.addEventListener('resize', updateStickyTop);
+
 
 // ── UPLOAD PANEL ──────────────────────────────────────────────────────────────
 function openUpload() {
@@ -677,7 +698,13 @@ async function processFiles() {
       const svar= s.ytd_share_var || 0;
       const mvar= s.ytd_merc_var  || 0;
       if (Math.abs(luc) > 2) s.classificacao = 'Crítico';
-      else if (luc >= 0.05)  s.classificacao = 'Saudável';
+      // Saudável: luc >= 5% com recuperação sólida (alta ou histórico limpo)
+      else if (luc >= 0.10) s.classificacao = 'Saudável';                   // acima de 10% → sempre saudável
+      else if (luc >= 0.05 && s.n_neg <= 1) s.classificacao = 'Saudável';  // 5-10%, sem histórico ruim
+      else if (luc >= 0.05 && tr >= 0.05) s.classificacao = 'Saudável';    // 5-10%, recuperação forte (>5pp/mês)
+      // Atenção: positivo mas abaixo de 5%, ou positivo fraco com histórico negativo
+      else if (luc >= 0 && luc < 0.05 && s.n_neg === 0) s.classificacao = 'Saudável'; // sempre positivo mas modesto
+      else if (luc >= 0 && s.n_neg >= 2) s.classificacao = 'Atenção';      // positivo fraco com histórico ruim
       else if (luc >= 0 && tr >= 0) s.classificacao = 'Saudável';
       else if (luc < 0 && tr > 0.01 && svar > mvar && s.n_neg <= 3) s.classificacao = 'Atenção';
       else if (luc >= -0.10 && tr > 0) s.classificacao = 'Atenção';
