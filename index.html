@@ -25,7 +25,10 @@
   <div class="hcounts">
     <div class="hc"><div class="hc-v" id="h-tot" style="color:var(--muted2)">—</div><div class="hc-l">Setores</div></div>
     <div class="hc"><div class="hc-v" style="color:var(--green)" id="h-s">—</div><div class="hc-l">Saudável</div></div>
+    <div class="hc"><div class="hc-v" style="color:var(--blue)" id="h-est">—</div><div class="hc-l">Estável</div></div>
     <div class="hc"><div class="hc-v" style="color:var(--yellow)" id="h-a">—</div><div class="hc-l">Atenção</div></div>
+    <div class="hc"><div class="hc-v" style="color:var(--purple)" id="h-rec">—</div><div class="hc-l">Em Rec.</div></div>
+    <div class="hc"><div class="hc-v" style="color:var(--orange)" id="h-alr">—</div><div class="hc-l">ALERTA</div></div>
     <div class="hc"><div class="hc-v" style="color:var(--red)" id="h-c">—</div><div class="hc-l">Crítico</div></div>
     <button class="btn-upload" onclick="openUpload()">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 10V3M5 6l3-3 3 3M3 12h10"/></svg>
@@ -75,22 +78,32 @@
     <div class="kpis">
       <div class="kpi ks" id="ki-s" onclick="kpiClick('Saudável','ki-s')">
         <div class="kv" style="color:var(--green)" id="kv-s">—</div>
-        <div class="kl">Saudável</div><div class="ks2">Luc. positiva e/ou crescendo</div>
+        <div class="kl">Saudável</div><div class="ks2">PE ≥ 8%</div>
+        <div class="khint">Filtrar ↓</div>
+      </div>
+      <div class="kpi" id="ki-est" onclick="kpiClick('Estável','ki-est')" style="--kpi-accent:var(--blue)">
+        <div class="kv" style="color:var(--blue)" id="kv-est">—</div>
+        <div class="kl" style="color:var(--blue)">Estável</div><div class="ks2">PE 4–8% + ≥ mercado</div>
         <div class="khint">Filtrar ↓</div>
       </div>
       <div class="kpi ka_" id="ki-a" onclick="kpiClick('Atenção','ki-a')">
         <div class="kv" style="color:var(--yellow)" id="kv-a">—</div>
-        <div class="kl">Atenção Recuperando</div><div class="ks2">Negativos com sinais de melhora</div>
+        <div class="kl">Atenção</div><div class="ks2">PE 4–8% + abaixo mercado</div>
         <div class="khint">Filtrar ↓</div>
       </div>
-      <div class="kpi kn" id="ki-ns" onclick="kpiClick('neg_sem_melhora','ki-ns')">
-        <div class="kv" style="color:var(--orange)" id="kv-ns">—</div>
-        <div class="kl">Neg. Sem Melhora</div><div class="ks2">Neg. consecutivo e perdendo share</div>
+      <div class="kpi" id="ki-rec" onclick="kpiClick('Em Recuperação','ki-rec')" style="--kpi-accent:var(--purple)">
+        <div class="kv" style="color:var(--purple)" id="kv-rec">—</div>
+        <div class="kl" style="color:var(--purple)">Em Recuperação</div><div class="ks2">PE 0–4% + ≥ mercado</div>
+        <div class="khint">Filtrar ↓</div>
+      </div>
+      <div class="kpi kn" id="ki-alr" onclick="kpiClick('ALERTA','ki-alr')">
+        <div class="kv" style="color:var(--orange)" id="kv-alr">—</div>
+        <div class="kl" style="color:var(--orange)">ALERTA</div><div class="ks2">PE 0–4% ou neg. + ≥ mercado</div>
         <div class="khint">Filtrar ↓</div>
       </div>
       <div class="kpi kc" id="ki-c" onclick="kpiClick('Crítico','ki-c')">
         <div class="kv" style="color:#7f1d1d" id="kv-c">—</div>
-        <div class="kl" style="color:#991b1b">Crítico</div><div class="ks2" style="color:#b91c1c">Sem recuperação clara</div>
+        <div class="kl" style="color:#991b1b">Crítico</div><div class="ks2" style="color:#b91c1c">PE negativo + abaixo mercado</div>
         <div class="khint">Filtrar ↓</div>
       </div>
     </div>
@@ -106,9 +119,11 @@
   <div class="legrow">
     <span style="color:var(--muted);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Classificação:</span>
     <span class="li"><span class="d6 s"></span>Saudável</span>
+    <span class="li"><span class="d6 est"></span>Estável</span>
     <span class="li"><span class="d6 a"></span>Atenção</span>
+    <span class="li"><span class="d6 rec"></span>Em Recuperação</span>
+    <span class="li"><span class="d6 alr"></span>ALERTA</span>
     <span class="li"><span class="d6 c"></span>Crítico</span>
-    <span style="color:var(--muted);font-size:9px">⭐ negativo mas vende acima do mercado &nbsp;|&nbsp; <b style="color:var(--orange)">Neg. Sem Melhora</b> = negativo em MAR e ABR + perdendo share YTD</span>
     <div style="display:flex;align-items:center;gap:6px;padding:3px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px">
       <span style="font-size:9px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em" id="lbl-consolidada">Luc. Brasil ABR</span>
       <span id="kv-med" style="font-family:var(--ff);font-weight:800;font-size:14px;color:var(--green)">—</span>
@@ -173,7 +188,9 @@
     <div style="background:#f0f6ff;border:1px solid #c7d9f5;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:11px;color:#2d4a7a;line-height:1.6">
       <span style="font-weight:800">📅 Fluxo mensal:</span>
       &nbsp;No primeiro acesso suba todas as lucratividades + desempenho atual. A cada novo mês, clique em
-      <b>Limpar dados salvos</b>, adicione a nova lucratividade junto com as anteriores e o desempenho atualizado.
+      <b>Limpar dados salvos</b>, adicione a nova lucratividade junto com as anteriores e o desempenho atualizado.<br>
+      <span style="font-weight:800">📁 Nome dos arquivos:</span>
+      &nbsp;O arquivo de lucratividade precisa conter <b>lucratividade</b> e o <b>mês</b> no nome (ex: <em>Lucratividade_ABR26.xlsx</em>). O de desempenho precisa conter <b>desempenho</b> e o <b>mês</b> (ex: <em>Desempenho_ABR26.xlsx</em>).
     </div>
 
     <!-- Dois painéis lado a lado -->
@@ -238,46 +255,72 @@
 <div class="legend-modal-overlay" id="legend-overlay" onclick="closeLegendIfBg(event)">
   <div class="legend-modal">
     <h2>
-      📋 O que significa cada card?
+      📋 O que significa cada classificação?
       <button class="legend-modal-close" onclick="closeLegend()">×</button>
     </h2>
-    <div class="legend-item">
-      <div class="legend-dot" style="background:var(--green)"></div>
-      <div class="legend-content">
-        <h3 style="color:var(--green)">Saudável</h3>
-        <p>Setores com lucratividade positiva no mês mais recente, ou com tendência de melhora consistente.</p>
-        <code>luc ≥ 5%  |  luc ≥ 0% e tendência ↑</code>
+    <div style="background:#f0f6ff;border:1px solid #c7d9f5;border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:11.5px;color:#1e3a5f;line-height:1.8">
+      <strong>📐 Como os setores são classificados?</strong><br>
+      Cada setor é avaliado por dois critérios em conjunto:<br>
+      <b>1. Saúde financeira</b> — medida pela <em>folga acima do Ponto de Equilíbrio</em>: o quanto as vendas superam o mínimo necessário para cobrir todos os custos do setor. Quanto maior essa folga, mais seguro é o setor.<br>
+      <b>2. Crescimento de mercado</b> — se o setor está crescendo acima ou abaixo do mercado onde atua.<br>
+      A saúde financeira tem peso maior: um setor com boa folga nunca é classificado como Crítico.
+    </div>
+    <div class="legend-grid">
+      <div class="legend-item">
+        <div class="legend-dot" style="background:var(--green)"></div>
+        <div class="legend-content">
+          <h3 style="color:var(--green)">Saudável</h3>
+          <p>As vendas estão pelo menos <b>8% acima</b> do mínimo necessário para cobrir todos os custos. O colchão financeiro é confortável — independe de como está o crescimento de mercado.</p>
+          <code>Folga acima do Ponto de Equilíbrio ≥ 8%</code>
+        </div>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:var(--blue)"></div>
+        <div class="legend-content">
+          <h3 style="color:var(--blue)">Estável</h3>
+          <p>As vendas estão entre <b>4% e 7,9%</b> acima do mínimo necessário <b>e</b> o setor está crescendo igual ou acima do mercado. Financeiramente próximo do limite, mas com bom sinal de crescimento.</p>
+          <code>Folga 4–8%  e  Supera cresce ≥ mercado</code>
+        </div>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:var(--yellow)"></div>
+        <div class="legend-content">
+          <h3 style="color:var(--yellow)">Atenção</h3>
+          <p>As vendas estão entre <b>4% e 7,9%</b> acima do mínimo necessário, mas o setor está crescendo <b>abaixo do mercado</b>. A margem de segurança é pequena e o setor está perdendo espaço.</p>
+          <code>Folga 4–8%  e  Supera cresce &lt; mercado</code>
+        </div>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:var(--purple)"></div>
+        <div class="legend-content">
+          <h3 style="color:var(--purple)">Em Recuperação</h3>
+          <p>As vendas estão entre <b>0% e 3,9%</b> acima do mínimo necessário — muito próximo do limite — <b>mas</b> o setor está crescendo acima do mercado. Ainda frágil, mas caminhando na direção certa.</p>
+          <code>Folga 0–4%  e  Supera cresce ≥ mercado</code>
+        </div>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:var(--orange)"></div>
+        <div class="legend-content">
+          <h3 style="color:var(--orange)">ALERTA</h3>
+          <p>Duas situações: (1) Folga de 0–3,9% e crescendo abaixo do mercado — positivo mas frágil e perdendo terreno; (2) Vendas abaixo do mínimo necessário, mas crescendo acima do mercado — no prejuízo porém com sinal de melhora.</p>
+          <code>Folga 0–4% e Supera &lt; mercado  |  Folga negativa e Supera ≥ mercado</code>
+        </div>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:var(--red)"></div>
+        <div class="legend-content">
+          <h3 style="color:var(--red)">Crítico</h3>
+          <p>As vendas estão <b>abaixo do mínimo necessário</b> para cobrir os custos — o setor opera no prejuízo — <b>e</b> ainda está crescendo abaixo do mercado. Sem resultado financeiro e sem sinal de melhora. Requer ação imediata.</p>
+          <code>Folga negativa  e  Supera cresce &lt; mercado</code>
+        </div>
       </div>
     </div>
-    <div class="legend-item">
-      <div class="legend-dot" style="background:var(--yellow)"></div>
-      <div class="legend-content">
-        <h3 style="color:var(--yellow)">Atenção Recuperando</h3>
-        <p>Setores com lucratividade negativa, mas com sinais claros de recuperação: tendência de melhora, ganho de share de mercado ou poucos meses negativos.</p>
-        <code>luc &lt; 0  e  (tendência ↑  |  ganhando share  |  ≤ 3 meses neg.)</code>
-      </div>
-    </div>
-    <div class="legend-item">
-      <div class="legend-dot" style="background:var(--orange)"></div>
-      <div class="legend-content">
-        <h3 style="color:var(--orange)">Neg. Sem Melhora</h3>
-        <p>Alerta transversal — setores que estão negativos nos dois meses mais recentes (MAR e ABR) <strong>e</strong> perdendo share de mercado no acumulado YTD. Subconjunto de Atenção e Crítico.</p>
-        <code>luc_ABR &lt; 0  e  luc_MAR &lt; 0  e  share_ytd ≤ 0</code>
-      </div>
-    </div>
-    <div class="legend-item">
-      <div class="legend-dot" style="background:var(--red)"></div>
-      <div class="legend-content">
-        <h3 style="color:var(--red)">Crítico</h3>
-        <p>Setores com lucratividade negativa e sem nenhum sinal de recuperação: tendência de piora, perdendo share e múltiplos meses consecutivos no negativo.</p>
-        <code>luc &lt; 0  e  sem tendência positiva  e  sem ganho de share</code>
-      </div>
-    </div>
-    <div style="margin-top:14px;padding:10px 12px;background:var(--surface2);border-radius:8px;font-size:11px;color:var(--muted2);line-height:1.6">
-      💡 <strong>Dica:</strong> Clique em qualquer card para filtrar a tabela. A lucratividade consolidada na barra de legenda muda conforme o filtro de Regional ou Distrital selecionado.
+    <div style="padding:10px 12px;background:var(--surface2);border-radius:8px;font-size:11px;color:var(--muted2);line-height:1.6">
+      💡 <strong>Dica:</strong> Clique em qualquer card para filtrar a tabela. Passe o mouse sobre o badge de classificação de um setor para ver o motivo detalhado da classificação.
     </div>
   </div>
 </div>
+
 
 <script src="script.js"></script>
 </body>

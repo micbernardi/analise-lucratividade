@@ -147,10 +147,12 @@ function kpiClick(f, id) {
   document.querySelectorAll('.kpi').forEach(k => k.classList.remove('ka'));
   document.getElementById(id).classList.add('ka');
   const labels = {
-    'Saudável'        : '✓ Saudável',
-    'Atenção'         : '⚠ Atenção Recuperando',
-    'Crítico'         : '✕ Crítico',
-    'neg_sem_melhora' : '↓ Negativos sem melhora',
+    'Saudável'        : '● Saudável',
+    'Estável'         : '● Estável',
+    'Atenção'         : '● Atenção',
+    'Em Recuperação'  : '● Em Recuperação',
+    'ALERTA'          : '● ALERTA',
+    'Crítico'         : '● Crítico',
   };
   document.getElementById('afb-lbl').textContent = labels[f] || f;
   document.getElementById('afb').classList.add('show');
@@ -190,14 +192,7 @@ function getBase() {
 function applyFilters() {
   const base = getBase();
   filtered = base.filter(s => {
-    if (kpiF === 'Saudável'        && s.classificacao !== 'Saudável') return false;
-    if (kpiF === 'Atenção'         && s.classificacao !== 'Atenção')  return false;
-    if (kpiF === 'Crítico'         && s.classificacao !== 'Crítico')  return false;
-    if (kpiF === 'neg_sem_melhora') {
-      const _last = activeMeses[activeMeses.length-1];
-      const _prev = activeMeses[activeMeses.length-2];
-      if (!((s['luc_'+_last] || 0) < 0 && _prev && (s['luc_'+_prev] || 0) < 0 && (s.ytd_share_var || 0) <= 0)) return false;
-    }
+    if (kpiF && s.sub_class !== kpiF && !(kpiF === 'Saudável' && s.sub_class === 'Excelente')) return false;
     return true;
   });
   filtered.sort((a, b) => {
@@ -222,24 +217,23 @@ function sortBy(col) {
 
 function updateHdr(base) {
   document.getElementById('h-tot').textContent = base.length;
-  document.getElementById('h-s').textContent = base.filter(x => x.classificacao === 'Saudável').length;
-  document.getElementById('h-a').textContent = base.filter(x => x.classificacao === 'Atenção').length;
-  document.getElementById('h-c').textContent = base.filter(x => x.classificacao === 'Crítico').length;
+  document.getElementById('h-s').textContent   = base.filter(x => x.sub_class === 'Saudável' || x.sub_class === 'Excelente').length;
+  document.getElementById('h-est').textContent = base.filter(x => x.sub_class === 'Estável').length;
+  document.getElementById('h-a').textContent   = base.filter(x => x.sub_class === 'Atenção' || x.sub_class === 'Atenção ao Mercado').length;
+  document.getElementById('h-rec').textContent = base.filter(x => x.sub_class === 'Em Recuperação').length;
+  document.getElementById('h-alr').textContent = base.filter(x => x.sub_class === 'ALERTA').length;
+  document.getElementById('h-c').textContent   = base.filter(x => x.sub_class === 'Crítico').length;
 }
 
 function updateKPIs(base) {
   if (!base.length) return;
   const lastM = activeMeses[activeMeses.length - 1];
-  const prevM = activeMeses[activeMeses.length - 2];
-  document.getElementById('kv-s').textContent  = base.filter(x => x.classificacao === 'Saudável').length;
-  document.getElementById('kv-a').textContent  = base.filter(x => x.classificacao === 'Atenção').length;
-  document.getElementById('kv-c').textContent  = base.filter(x => x.classificacao === 'Crítico').length;
-  // Neg. Sem Melhora: negativos em ABR e MAR, perdendo share YTD — subconjunto de Atenção+Crítico
-  document.getElementById('kv-ns').textContent = base.filter(x => {
-    const _l = activeMeses[activeMeses.length-1];
-    const _p = activeMeses[activeMeses.length-2];
-    return (x['luc_'+_l] || 0) < 0 && _p && (x['luc_'+_p] || 0) < 0 && (x.ytd_share_var || 0) <= 0;
-  }).length;
+  document.getElementById('kv-s').textContent   = base.filter(x => x.sub_class === 'Saudável' || x.sub_class === 'Excelente').length;
+  document.getElementById('kv-est').textContent = base.filter(x => x.sub_class === 'Estável').length;
+  document.getElementById('kv-a').textContent   = base.filter(x => x.sub_class === 'Atenção' || x.sub_class === 'Atenção ao Mercado').length;
+  document.getElementById('kv-rec').textContent = base.filter(x => x.sub_class === 'Em Recuperação').length;
+  document.getElementById('kv-alr').textContent = base.filter(x => x.sub_class === 'ALERTA').length;
+  document.getElementById('kv-c').textContent   = base.filter(x => x.sub_class === 'Crítico').length;
 
   // Luc consolidada: busca no nível do filtro ativo (GD > GR > Brasil)
   const reg  = document.getElementById('f-reg').value;
@@ -281,10 +275,44 @@ function renderTable() {
   }
 
   tbody.innerHTML = slice.map(s => {
-    const cls = s.classificacao === 'Saudável' ? 's' : s.classificacao === 'Atenção' ? 'a' : 'c';
-    const badge = `<span class="bc ${cls}"><span class="d6 ${cls}"></span>${
-      s.classificacao === 'Saudável' ? 'Saudável' : s.classificacao === 'Atenção' ? 'Atenção' : 'Crítico'
-    }</span>`;
+    // Badge com os 5 status usando sub_class
+    const sub = s.sub_class || s.classificacao;
+    const badgeCfg = {
+      'Saudável':          { cls: 's',    label: 'Saudável' },
+      'Excelente':         { cls: 's',    label: 'Saudável' },
+      'Estável':           { cls: 'est',  label: 'Estável' },
+      'Atenção':           { cls: 'a',    label: 'Atenção' },
+      'Atenção ao Mercado':{ cls: 'a',    label: 'Atenção' },
+      'Em Recuperação':    { cls: 'rec',  label: 'Em Recuperação' },
+      'ALERTA':            { cls: 'alr',  label: 'ALERTA' },
+      'Crítico':           { cls: 'c',    label: 'Crítico' },
+    };
+    const bc = badgeCfg[sub] || badgeCfg[s.classificacao] || { cls: 'c', label: s.classificacao };
+
+    // Dados para o tooltip — guardados em data-attributes para evitar problema de overflow
+    const folga = s.folga_pe != null ? s.folga_pe.toFixed(1) + '%' : '—';
+    const folgaNum = s.folga_pe != null ? s.folga_pe : null;
+    const supVar  = s.ytd_sup_var  != null ? (s.ytd_sup_var  * 100).toFixed(2) + '%' : '—';
+    const mercVar = s.ytd_merc_var != null ? (s.ytd_merc_var * 100).toFixed(2) + '%' : '—';
+    const acimaMerc = s.ytd_sup_var != null && s.ytd_merc_var != null && s.ytd_sup_var >= s.ytd_merc_var;
+
+    const motivoFin = folgaNum == null ? 'Dados de Ponto de Equilíbrio indisponíveis.' :
+      folgaNum >= 8  ? `Folga de ${folga} acima do Ponto de Equilíbrio — colchão financeiro confortável.` :
+      folgaNum >= 4  ? `Folga de ${folga} acima do Ponto de Equilíbrio — zona intermediária, próximo do limite.` :
+      folgaNum >= 0  ? `Folga de ${folga} acima do Ponto de Equilíbrio — muito próximo do limite.` :
+                       `Folga de ${folga} — abaixo do Ponto de Equilíbrio, operando no prejuízo.`;
+
+    const motivoMerc = acimaMerc
+      ? `Supera (${supVar}) crescendo acima do mercado (${mercVar}) ✔`
+      : `Supera (${supVar}) crescendo abaixo do mercado (${mercVar}) ✖`;
+
+    const badge = `<span class="bc ${bc.cls} badge-wrap"
+      data-tip-title="${bc.label}"
+      data-tip-fin="${motivoFin.replace(/"/g, '&quot;')}"
+      data-tip-merc="${motivoMerc.replace(/"/g, '&quot;')}"
+      onmouseenter="showBadgeTip(event,this)"
+      onmouseleave="hideBadgeTip()"
+    ><span class="d6 ${bc.cls}"></span>${bc.label}</span>`;
 
     const lv    = s['luc_' + viewM];
     const lvS   = (lv != null && Math.abs(lv) < 2) ? lv : null;
@@ -502,15 +530,17 @@ async function processFiles() {
 
       // Detect month from header row
       const header = rows[0].map(c => String(c || ''));
-      const supIdx = header.findIndex(c => c.includes('SUPERA R$'));
-      const mktIdx = header.findIndex(c => c.includes('MKT SH'));
-      const lucIdx = header.findIndex(c => c.includes('LUCRATIVIDADE'));
-      const lucRIdx= header.findIndex(c => c.includes('LUCRO'));
-      const vendIdx= header.findIndex(c => c.includes('VENDA'));
+      const supIdx  = header.findIndex(c => c.includes('SUPERA R$'));
+      const mktIdx  = header.findIndex(c => c.includes('MKT SH'));
+      const lucIdx  = header.findIndex(c => c.includes('LUCRATIVIDADE'));
+      const lucRIdx = header.findIndex(c => c.includes('LUCRO'));
+      const vendIdx = header.findIndex(c => c.includes('VENDA'));
+      const dfIdx   = header.findIndex(c => c.includes('DESPESA FIXA'));
+      const dvIdx   = header.findIndex(c => c.includes('DESPESA VARIÁVEL'));
 
-      // Detect mes abbreviation from SUPERA R$ column header
+      // Detect mes abbreviation — tenta pelo cabeçalho da coluna, fallback pelo nome do arquivo
       const supHeader = header[supIdx] || '';
-      let mes = detectMes(supHeader);
+      let mes = detectMes(supHeader) || detectMes(file.name);
       if (!mes) { console.warn('Mês não detectado em', file.name, supHeader); continue; }
 
       lucData[mes] = {};
@@ -555,11 +585,13 @@ async function processFiles() {
         lucData[mes][code] = {
           nome, reg: reg.replace('.0','').padStart(6,'0'),
           dist: dist.replace('.0','').padStart(6,'0'),
-          luc:     safeNum(row[lucIdx]),
-          lucro:   safeNum(row[lucRIdx]),
-          sup_ytd: safeNum(row[supIdx]),
-          mkt_ytd: safeNum(row[mktIdx]),
-          venda:   safeNum(row[vendIdx]),
+          luc:       safeNum(row[lucIdx]),
+          lucro:     safeNum(row[lucRIdx]),
+          sup_ytd:   safeNum(row[supIdx]),
+          mkt_ytd:   safeNum(row[mktIdx]),
+          venda:     safeNum(row[vendIdx]),
+          desp_fixa: safeNum(row[dfIdx]),
+          desp_var:  safeNum(row[dvIdx]),
         };
       }
     }
@@ -688,28 +720,78 @@ async function processFiles() {
       // n_neg
       s.n_neg = sortedMeses.filter(m => (s['luc_'+m] || 0) < 0).length;
 
-      // Trend
-      const lucVals = sortedMeses.map(m => s['luc_'+m]).filter(v => v != null && Math.abs(v) < 2);
-      s.trend_pct = lucVals.length >= 2 ? polyfit1(lucVals) : null;
+      // ── PONTO DE EQUILÍBRIO (YTD do mês mais recente) ───────────────────────
+      // BE = Despesa Fixa / (1 - Despesa Variável / Venda Líquida)
+      const d_lastM = lucData[lastM][code];
+      const _df  = d_lastM?.desp_fixa ?? null;
+      const _dv  = d_lastM?.desp_var  ?? null;
+      const _vl  = d_lastM?.venda     ?? null;
+      let folga_pe = null; // % acima/abaixo do BE
+      if (_df != null && _dv != null && _vl != null && _vl > 0) {
+        const mc_pct = 1 - (_dv / _vl);          // margem de contribuição %
+        const be_ytd = mc_pct > 0 ? _df / mc_pct : null;
+        if (be_ytd != null && be_ytd > 0) {
+          folga_pe = ((_vl - be_ytd) / be_ytd) * 100; // % folga acima do BE
+        }
+      }
+      s.folga_pe = folga_pe; // expõe para uso futuro
 
-      // Classificação
-      const luc = s['luc_' + lastM] || 0;
-      const tr  = s.trend_pct || 0;
-      const svar= s.ytd_share_var || 0;
-      const mvar= s.ytd_merc_var  || 0;
-      if (Math.abs(luc) > 2) s.classificacao = 'Crítico';
-      // Saudável: luc >= 5% com recuperação sólida (alta ou histórico limpo)
-      else if (luc >= 0.10) s.classificacao = 'Saudável';                   // acima de 10% → sempre saudável
-      else if (luc >= 0.05 && s.n_neg <= 1) s.classificacao = 'Saudável';  // 5-10%, sem histórico ruim
-      else if (luc >= 0.05 && tr >= 0.05) s.classificacao = 'Saudável';    // 5-10%, recuperação forte (>5pp/mês)
-      // Atenção: positivo mas abaixo de 5%, ou positivo fraco com histórico negativo
-      else if (luc >= 0 && luc < 0.05 && s.n_neg === 0) s.classificacao = 'Saudável'; // sempre positivo mas modesto
-      else if (luc >= 0 && s.n_neg >= 2) s.classificacao = 'Atenção';      // positivo fraco com histórico ruim
-      else if (luc >= 0 && tr >= 0) s.classificacao = 'Saudável';
-      else if (luc < 0 && tr > 0.01 && svar > mvar && s.n_neg <= 3) s.classificacao = 'Atenção';
-      else if (luc >= -0.10 && tr > 0) s.classificacao = 'Atenção';
-      else if (luc >= -0.05) s.classificacao = 'Atenção';
-      else s.classificacao = 'Crítico';
+      // ── EIXO 1: Saúde Financeira (Ponto de Equilíbrio) ──────────────────────
+      // Três faixas de folga acima do BE:
+      // saudavel_fin:     folga >= 8%
+      // intermediario_fin: folga 4% a 7,9%
+      // fragil_fin:       folga < 4% (inclui negativos)
+      const PE_SAUDAVEL      = 8;
+      const PE_INTERMEDIARIO = 4;
+      let saudavel_fin, intermediario_fin, fragil_fin;
+      if (folga_pe != null) {
+        saudavel_fin      = folga_pe >= PE_SAUDAVEL;
+        intermediario_fin = folga_pe >= PE_INTERMEDIARIO && folga_pe < PE_SAUDAVEL;
+        fragil_fin        = folga_pe < PE_INTERMEDIARIO;
+      } else {
+        // fallback para % de lucratividade
+        const luc_fb = s['luc_' + lastM] || 0;
+        saudavel_fin      = luc_fb >= 0.05;
+        intermediario_fin = luc_fb >= 0.02 && luc_fb < 0.05;
+        fragil_fin        = luc_fb < 0.02;
+      }
+
+      // ── EIXO 2: Desempenho vs Mercado ────────────────────────────────────────
+      const sup_var   = s.ytd_sup_var  || 0;
+      const merc_var  = s.ytd_merc_var || 0;
+      const share_var = s.ytd_share_var || 0;
+      const acima_merc   = sup_var >= merc_var; // crescendo igual ou acima
+      const ganhou_share = share_var > 0;
+
+      // ── CLASSIFICAÇÃO FINAL (6 status) ───────────────────────────────────────
+      // Saudável       → PE ≥ 8%
+      // Estável        → PE 4–7,9% + crescendo igual/acima do mercado
+      // Atenção        → PE 4–7,9% + abaixo do mercado
+      // Em Recuperação → PE 0–3,9% + crescendo igual/acima do mercado
+      // ALERTA         → PE 0–3,9% + abaixo do mercado  OU  PE negativo + acima do mercado
+      // Crítico        → PE negativo + abaixo do mercado
+      if (saudavel_fin) {
+        s.classificacao = 'Saudável';
+        s.sub_class     = 'Saudável';
+      } else if (intermediario_fin && acima_merc) {
+        s.classificacao = 'Atenção';
+        s.sub_class     = 'Estável';
+      } else if (intermediario_fin && !acima_merc) {
+        s.classificacao = 'Atenção';
+        s.sub_class     = 'Atenção';
+      } else if (fragil_fin && folga_pe >= 0 && acima_merc) {
+        s.classificacao = 'Atenção';
+        s.sub_class     = 'Em Recuperação';
+      } else if (fragil_fin && folga_pe >= 0 && !acima_merc) {
+        s.classificacao = 'Atenção';
+        s.sub_class     = 'ALERTA';
+      } else if (folga_pe < 0 && acima_merc) {
+        s.classificacao = 'Atenção';
+        s.sub_class     = 'ALERTA';
+      } else {
+        s.classificacao = 'Crítico';
+        s.sub_class     = 'Crítico';
+      }
 
       setores.push(s);
     }
@@ -784,12 +866,35 @@ function clearAllData() {
 }
 
 // ── XLSX HELPERS ──────────────────────────────────────────────────────────────
+// Detecta mês em qualquer string (cabeçalho de coluna ou nome de arquivo)
+// Aceita nome completo (JANEIRO) ou abreviação (JAN)
 function detectMes(str) {
-  str = str.toUpperCase();
+  if (!str) return null;
+  str = str.toUpperCase()
+           .normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // remove acentos
+  // Tenta nome completo primeiro
   for (const [abr, full] of Object.entries(MESES_PTBR)) {
-    if (str.includes(full)) return abr;
+    const fullNorm = full.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (str.includes(fullNorm)) return abr;
+  }
+  // Tenta abreviação (3 letras) como palavra isolada
+  for (const abr of Object.keys(MESES_PTBR)) {
+    const re = new RegExp('\\b' + abr + '\\b');
+    if (re.test(str)) return abr;
   }
   return null;
+}
+
+// Verifica se arquivo é de lucratividade (nome contém "lucratividade" ou "lucrativ")
+function isLucFile(name) {
+  const n = name.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return n.includes('LUCRATIVIDADE') || n.includes('LUCRATIV');
+}
+
+// Verifica se arquivo é de desempenho (nome contém "desempenho" ou "desemp")
+function isDesempFile(name) {
+  const n = name.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return n.includes('DESEMPENHO') || n.includes('DESEMP');
 }
 
 function safeNum(v) {
@@ -809,6 +914,60 @@ function polyfit1(vals) {
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ── BADGE TOOLTIP GLOBAL ──────────────────────────────────────────────────────
+// Cria o elemento tooltip uma única vez no body
+(function() {
+  const el = document.createElement('div');
+  el.id = 'badge-tooltip';
+  el.innerHTML = '<div class="badge-tip-title" id="btt"></div><div class="badge-tip-row" id="btf"></div><div class="badge-tip-row" id="btm"></div>';
+  document.body.appendChild(el);
+})();
+
+function showBadgeTip(e, el) {
+  const tip = document.getElementById('badge-tooltip');
+  document.getElementById('btt').textContent = el.dataset.tipTitle || '';
+  document.getElementById('btf').textContent = el.dataset.tipFin  || '';
+  document.getElementById('btm').textContent = el.dataset.tipMerc || '';
+
+  tip.classList.add('show');
+
+  const rect = el.getBoundingClientRect();
+  const tipW = 260;
+  const tipH = tip.offsetHeight || 90;
+
+  // Posição horizontal — centrado no badge, sem sair da tela
+  let left = rect.left + rect.width / 2 - tipW / 2;
+  left = Math.max(8, Math.min(left, window.innerWidth - tipW - 8));
+
+  // Posição vertical — aparece abaixo, mas se não couber aparece acima
+  const spaceAbaixo = window.innerHeight - rect.bottom;
+  const spaceAcima  = rect.top;
+  let top, acima;
+
+  if (spaceAbaixo >= tipH + 12) {
+    top = rect.bottom + 8;
+    acima = false;
+  } else {
+    top = rect.top - tipH - 8;
+    acima = true;
+  }
+
+  tip.style.left = left + 'px';
+  tip.style.top  = top + 'px';
+  tip.style.width = tipW + 'px';
+
+  // Ajusta a setinha para apontar na direção certa
+  tip.style.setProperty('--arrow-top', acima ? 'auto' : '0');
+  tip.style.setProperty('--arrow-bottom', acima ? '0' : 'auto');
+  tip.style.setProperty('--arrow-border-top', acima ? `6px solid #1e3a5f` : '6px solid transparent');
+  tip.style.setProperty('--arrow-border-bottom', acima ? '6px solid transparent' : `6px solid #1e3a5f`);
+}
+
+function hideBadgeTip() {
+  const tip = document.getElementById('badge-tooltip');
+  if (tip) tip.classList.remove('show');
+}
 
 // ── FORMAT HELPERS ────────────────────────────────────────────────────────────
 function fp(v)   { if (v == null) return '—'; return (v * 100).toFixed(2) + '%'; }
