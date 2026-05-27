@@ -595,7 +595,7 @@ function removeLuc(i)        { pendingLuc.splice(i, 1); renderFileList('luc'); u
 function removeDesemp(i)     { pendingDesemp.splice(i, 1); renderFileList('desemp'); updateProcessBtn(); }
 
 function updateProcessBtn() {
-  document.getElementById('btn-process').disabled = !(pendingLuc.length > 0 && pendingDesemp.length > 0);
+  document.getElementById('btn-process').disabled = !(pendingLuc.length > 0 || pendingDesemp.length > 0);
 }
 
 // ── XLSX PROCESSING ───────────────────────────────────────────────────────────
@@ -608,14 +608,49 @@ async function processFiles() {
   document.getElementById('btn-process').disabled = true;
 
   try {
-    msg.textContent = 'Lendo arquivos de lucratividade…';
-    await sleep(50);
+    if (pendingLuc.length > 0) {
+      msg.textContent = 'Lendo arquivos de lucratividade…';
+      await sleep(50);
+    }
 
     // ── 1. Read all lucratividade files ──────────────────────────────────────
-    const lucData = {}; // { 'JAN': { code: {luc, lucro, sup_ytd, mkt_ytd, nome, reg, dist} } }
+    const lucData = {};
     const regMap = {}, distMap = {};
-    const brasilLucMap = {}, grLucMap = {}, gdLucMap = {}; // consolidated luc by level
+    const brasilLucMap = {}, grLucMap = {}, gdLucMap = {};
     const fileNames = { luc: pendingLuc.map(f => f.name), desemp: pendingDesemp.map(f => f.name) };
+
+    // If no luc files uploaded, reuse saved luc data from localStorage
+    if (pendingLuc.length === 0) {
+      try {
+        const saved = JSON.parse(localStorage.getItem('supera_data') || '{}');
+        if (saved.setores?.length) {
+          // Rebuild lucData from saved setores
+          const savedMeses = saved.meses || [];
+          savedMeses.forEach(m => {
+            lucData[m] = {};
+            (saved.setores || []).forEach(s => {
+              if (s['luc_' + m] != null || s['lucro_' + m] != null) {
+                lucData[m][s.code] = {
+                  nome: s.nome, reg: s.regional, dist: s.distrital, linha: s.linha,
+                  luc:       s['luc_'   + m] ?? null,
+                  lucro:     s['lucro_' + m] ?? null,
+                  sup_ytd:   null, mkt_ytd: null,
+                  venda:     null, desp_fixa: null, desp_var: null,
+                };
+              }
+            });
+          });
+          // Restore maps
+          Object.assign(regMap,  saved.regionais  || {});
+          Object.assign(distMap, saved.distritais || {});
+          Object.entries(saved.brasil_luc || {}).forEach(([m,v]) => brasilLucMap[m] = v);
+          Object.entries(saved.gr_luc || {}).forEach(([m,v]) => { grLucMap[m] = v; });
+          Object.entries(saved.gd_luc || {}).forEach(([m,v]) => { gdLucMap[m] = v; });
+          // Preserve old file names for luc
+          fileNames.luc = saved.sourceFiles?.luc || [];
+        }
+      } catch(e) { console.warn('Could not restore luc from saved data', e); }
+    }
 
     for (const file of pendingLuc) {
       msg.textContent = `Processando ${file.name}…`;
@@ -697,11 +732,13 @@ async function processFiles() {
 
     // GR/GD names and consolidated luc already extracted inline above
 
-    // ── 2. Read desempenho files (one per month) ──────────────────────────────
-    msg.textContent = 'Processando planilhas de desempenho…';
-    await sleep(50);
+    // ── 2. Read desempenho files (one per month) — optional ──────────────────
+    if (pendingDesemp.length > 0) {
+      msg.textContent = 'Processando planilhas de desempenho…';
+      await sleep(50);
+    }
 
-    const desempByMes = {}; // { 'JAN': { code: {...} }, 'FEV': {...}, ... }
+    const desempByMes = {};
     let lastDesempMes = null;
     let nMeses = 1;
 
@@ -714,7 +751,6 @@ async function processFiles() {
       const wb2    = XLSX.read(await desempFile.arrayBuffer(), { type: 'array' });
       const desemp = {};
       const allSheets = wb2.SheetNames;
-      // Detect sheet names dynamically
       const ytdSheet   = allSheets.find(s => s === 'YTD') || null;
       const mesXmesSheet = allSheets.find(s => {
         const p = s.split(' X ');
@@ -725,7 +761,6 @@ async function processFiles() {
         return p.length === 2 && p[0].trim() !== p[1].trim() && p[0].trim().length === 3 && p[1].trim().length === 3;
       }) || null;
 
-      // Detect month from mesXmesSheet or file name
       const currentMesAbbr = mesXmesSheet
         ? mesXmesSheet.split(' X ')[0].trim()
         : detectMes(desempFile.name);
@@ -755,7 +790,6 @@ async function processFiles() {
         const svI   = h.findIndex((c,i)=>c.startsWith('VARIAÇÃO')&&i>saNI);
         const shaNI = h.indexOf('SHARE ANT.');
         const shaCI = h.indexOf('SHARE ATUAL');
-        // Share var: always the column immediately after SHARE ATUAL
         const shvI  = shaCI >= 0 ? shaCI + 1 : -1;
 
         for (let r = hRow + 1; r < rows2.length; r++) {
@@ -777,10 +811,8 @@ async function processFiles() {
         }
       }
 
-      // Store by detected month
       if (currentMesAbbr) {
         desempByMes[currentMesAbbr] = desemp;
-        // Track latest desempenho month
         if (!lastDesempMes || fileMesN > (MESES_ABR[lastDesempMes] || 0)) {
           lastDesempMes = currentMesAbbr;
           nMeses = fileMesN;
@@ -788,7 +820,7 @@ async function processFiles() {
       }
     }
 
-    // Use latest desempenho file as the base for current setores data
+    // Use latest desempenho file as base (empty object if none loaded)
     const desemp = desempByMes[lastDesempMes] || {};
 
     // ── 3. Merge into setores ────────────────────────────────────────────────
@@ -796,9 +828,18 @@ async function processFiles() {
     await sleep(50);
 
     const sortedMeses = MESES.filter(m => lucData[m]);
-    // Usar apenas códigos do mês mais recente (evita setores desativados inflarem o total)
-    const lastMes = sortedMeses[sortedMeses.length - 1];
-    const allCodes = new Set(Object.keys(lucData[lastMes] || {}));
+
+    // If no luc files, build setores from desemp codes
+    let allCodes;
+    if (sortedMeses.length > 0) {
+      const lastMes = sortedMeses[sortedMeses.length - 1];
+      allCodes = new Set(Object.keys(lucData[lastMes] || {}));
+    } else {
+      // Only desemp loaded — build code list from desemp
+      const allDesempCodes = new Set();
+      Object.values(desempByMes).forEach(dm => Object.keys(dm).forEach(c => allDesempCodes.add(c)));
+      allCodes = allDesempCodes;
+    }
 
     const setores = [];
     for (const code of allCodes) {
@@ -834,7 +875,7 @@ async function processFiles() {
 
       // Venda média = YTD Supera (fonte oficial desempenho) ÷ número de meses
       const dp = desemp[code] || {};
-      const lastM = sortedMeses[sortedMeses.length - 1];
+      const lastM = sortedMeses.length > 0 ? sortedMeses[sortedMeses.length - 1] : null;
       s.venda_media = dp.ytd_sup_atual != null ? dp.ytd_sup_atual / nMeses : null;
 
       // Desempenho fields
@@ -844,8 +885,7 @@ async function processFiles() {
       s.n_neg = sortedMeses.filter(m => (s['luc_'+m] || 0) < 0).length;
 
       // ── PONTO DE EQUILÍBRIO (YTD do mês mais recente) ───────────────────────
-      // BE = Despesa Fixa / (1 - Despesa Variável / Venda Líquida)
-      const d_lastM = lucData[lastM][code];
+      const d_lastM = lastM ? (lucData[lastM]?.[code]) : null;
       const _df  = d_lastM?.desp_fixa ?? null;
       const _dv  = d_lastM?.desp_var  ?? null;
       const _vl  = d_lastM?.venda     ?? null;
@@ -1576,6 +1616,142 @@ function renderLuc() {
 
   // Re-apply focus if one was active before re-render
   if (lucFocusedCol) applyLucFocus();
+}
+
+// ── EXPORT LUC EXCEL ─────────────────────────────────────────────────────────
+async function exportLucExcel() {
+  if (!window.ExcelJS) { alert('Aguarde o carregamento da biblioteca ExcelJS...'); return; }
+
+  const reg  = document.getElementById('lf-reg').value;
+  const dist = document.getElementById('lf-dist').value;
+  const srch = (document.getElementById('lf-search').value||'').toLowerCase().trim();
+  const prevML = (() => { const i = activeMeses.indexOf(lucViewM); return i > 0 ? activeMeses[i-1] : null; })();
+
+  let data = SETORES.filter(s => {
+    if (reg  && s.regional  !== reg)  return false;
+    if (dist && s.distrital !== dist) return false;
+    if (lucLinhaVal && s.linha !== lucLinhaVal) return false;
+    if (srch && !s.nome.toLowerCase().includes(srch) && !s.code.includes(srch)) return false;
+    const cur   = s['lucro_' + lucViewM] ?? null;
+    const curL  = s['luc_'   + lucViewM] ?? null;
+    const curSign  = cur  != null ? cur  : (curL  != null ? (curL  >= 0 ? 1 : -1) : null);
+    const prev  = prevML ? (s['lucro_' + prevML] ?? null) : null;
+    const prevL = prevML ? (s['luc_'   + prevML] ?? null) : null;
+    const prevSign = prev != null ? prev : (prevL != null ? (prevL >= 0 ? 1 : -1) : null);
+    if (lucNegFilter      && (curSign == null || curSign >= 0)) return false;
+    if (lucVirouFilter    && (curSign == null || prevSign == null || !(prevSign >= 0 && curSign < 0))) return false;
+    if (lucVirouPosFilter && (curSign == null || prevSign == null || !(prevSign < 0 && curSign >= 0))) return false;
+    return true;
+  }).map(s => ({
+    ...s,
+    _lucro: s['lucro_' + lucViewM] ?? null,
+    _luc:   s['luc_'   + lucViewM] ?? null,
+    _class: lucClassify(s['lucro_' + lucViewM] ?? null),
+  })).filter(s => s._class !== null)
+    .sort((a,b) => {
+      const oi = lucClassOrder.indexOf(a._class) - lucClassOrder.indexOf(b._class);
+      return oi !== 0 ? oi : (a._lucro??0) - (b._lucro??0);
+    });
+
+  if (!data.length) { alert('Nenhum setor para exportar.'); return; }
+
+  const classLabel = {
+    'critico':'Crítico','alerta':'Alerta',
+    'atencao':'Atenção','atencao-leve':'Atenção Leve','saudavel':'Saudável'
+  };
+  const themeColor = {
+    'critico':'BE123C','alerta':'C2410C','atencao':'A16207',
+    'atencao-leve':'CA8A04','saudavel':'15803D'
+  };
+  const themeBg = {
+    'critico':'FFF1F2','alerta':'FFF7ED','atencao':'FFFBEB',
+    'atencao-leve':'FEFCE8','saudavel':'F0FDF4'
+  };
+
+  const wb = new ExcelJS.Workbook();
+  const sheetName = `Luc_${lucViewM}`.substring(0,31);
+  const ws = wb.addWorksheet(sheetName);
+
+  // Column definitions
+  ws.columns = [
+    { key:'cls',    width: 14 },
+    { key:'setor',  width: 56 },
+    { key:'linha',  width:  9 },
+    { key:'reg',    width: 28 },
+    { key:'dist',   width: 40 },
+    { key:'lucro',  width: 14 },
+    { key:'pct',    width: 11 },
+  ];
+
+  // Header row
+  const hdrRow = ws.addRow([
+    'Classificação','Setor','Linha','Regional','Distrital',
+    `Lucro R$ ${lucViewM}`, `Luc% ${lucViewM}`
+  ]);
+  hdrRow.height = 18;
+  hdrRow.eachCell(cell => {
+    cell.font      = { bold: true, color: { argb: 'FFFFFFFF' }, size: 12, name: 'Calibri' };
+    cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF002060' } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    cell.border    = { bottom: { style: 'thin', color: { argb: 'FFFFFFFF' } } };
+  });
+
+  // Freeze header
+  ws.views = [{ state: 'frozen', xSplit: 0, ySplit: 1, topLeftCell: 'A2', activeCell: 'A2' }];
+
+  // Data rows
+  data.forEach(s => {
+    const bg   = 'FF' + (themeBg[s._class]   || 'FFFFFF');
+    const fg   = 'FF' + (themeColor[s._class] || '000000');
+    const row  = ws.addRow([
+      classLabel[s._class] || '',
+      s.code + ' - ' + s.nome,
+      s.linha || '',
+      s.regional_nome || '',
+      s.distrital_nome || '',
+      s._lucro ?? null,
+      s._luc   ?? null,
+    ]);
+    row.height = 16;
+
+    row.eachCell({ includeEmpty: true }, (cell, colNum) => {
+      cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+      cell.border = { bottom: { style: 'thin', color: { argb: 'FFD9D9D9' } } };
+
+      const isLucro = colNum === 6;
+      const isPct   = colNum === 7;
+      const val     = cell.value;
+      const isNeg   = typeof val === 'number' && val < 0;
+      const numArgb = 'FF' + (isNeg ? 'B91C1C' : '15803D');
+
+      if (isLucro) {
+        cell.numFmt    = '\R\$\ #,##0;\-\R\$\ #,##0';
+        cell.font      = { bold: true, size: 12, name: 'Calibri', color: { argb: numArgb } };
+        cell.alignment = { horizontal: 'right', vertical: 'middle' };
+      } else if (isPct) {
+        cell.numFmt    = '0.00%';
+        cell.font      = { bold: true, size: 12, name: 'Calibri', color: { argb: numArgb } };
+        cell.alignment = { horizontal: 'right', vertical: 'middle' };
+      } else if (colNum === 1) {
+        cell.font      = { bold: true, size: 12, name: 'Calibri', color: { argb: fg } };
+        cell.alignment = { horizontal: 'left', vertical: 'middle' };
+      } else {
+        cell.font      = { size: 12, name: 'Calibri', color: { argb: 'FF000000' } };
+        cell.alignment = { horizontal: 'left', vertical: 'middle' };
+      }
+    });
+  });
+
+  // Download
+  const buf  = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  const date = new Date().toLocaleDateString('pt-BR').replace(/\//g,'-');
+  a.href     = url;
+  a.download = `SUPERA_Lucratividade_${lucViewM}_${date}.xlsx`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ── LEGEND MODAL ──────────────────────────────────────────────────────────────

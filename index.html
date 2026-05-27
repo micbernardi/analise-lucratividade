@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SUPERA · Rentabilidade & Desempenho</title>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=Archivo+Narrow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -370,6 +371,10 @@
           <button class="ctab t-virou-pos" id="lbtn-virou-pos" onclick="toggleLucVirouPos()">🔺 Virou Positivo</button>
         </div>
         <span id="luc-count" style="font-size:10px;color:var(--muted);font-weight:700;white-space:nowrap"></span>
+        <button class="btn-upload btn-export" onclick="exportLucExcel()" style="margin-left:8px">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3v7M5 7l3 3 3-3M3 12h10"/></svg>
+          Exportar Excel
+        </button>
       </div>
     </div>
   </div>
