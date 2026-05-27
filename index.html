@@ -236,7 +236,7 @@
         <div class="file-drop" id="desemp-drop" onclick="document.getElementById('desemp-input').click()"
              ondragover="dragOver(event,'desemp-drop')" ondragleave="dragLeave('desemp-drop')" ondrop="dropFiles(event,'desemp')"
              style="font-size:11px;padding:12px;border-color:#a5d6a7">
-          <input type="file" id="desemp-input" accept=".xlsx" onchange="addFiles(this.files,'desemp')">
+          <input type="file" id="desemp-input" multiple accept=".xlsx" onchange="addFiles(this.files,'desemp')">
           ＋ Clique ou arraste o XLSX de desempenho
         </div>
       </div>
