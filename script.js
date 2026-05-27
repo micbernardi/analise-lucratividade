@@ -1294,16 +1294,22 @@ let lucSortDir = 'desc';  // 'desc' = maior para menor, 'asc' = menor para maior
 function switchView(v) {
   currentView = v;
   document.getElementById('view-luc').style.display = v === 'luc' ? '' : 'none';
-  // Hide/show geral sections
-  ['fbar','main-geral'].forEach(id => {
-    const el = document.getElementById(id) || document.querySelector('.' + id);
-  });
+
+  // Hide/show geral-specific sections (fbar and main), but never the upload overlay
   const geralSections = document.querySelectorAll('.fbar, .main');
   geralSections.forEach(el => {
-    if (!el.closest('#view-luc')) el.style.display = v === 'geral' ? '' : 'none';
+    if (!el.closest('#view-luc') && !el.closest('#upload-overlay')) {
+      el.style.display = v === 'geral' ? '' : 'none';
+    }
   });
+
   document.getElementById('vt-geral').classList.toggle('active', v === 'geral');
   document.getElementById('vt-luc').classList.toggle('active', v === 'luc');
+
+  // Always keep export button accessible
+  const btnExp = document.getElementById('btn-export');
+  if (btnExp && SETORES.length) btnExp.style.display = '';
+
   if (v === 'luc') {
     syncLucFilters();
     renderLuc();
