@@ -25,11 +25,11 @@
   <div class="hcounts">
     <div class="hc"><div class="hc-v" id="h-tot" style="color:var(--muted2)">—</div><div class="hc-l">Setores</div></div>
     <div class="hc"><div class="hc-v" style="color:var(--green)" id="h-s">—</div><div class="hc-l">Saudável</div></div>
-    <div class="hc"><div class="hc-v" style="color:var(--blue)" id="h-est">—</div><div class="hc-l">Estável</div></div>
     <div class="hc"><div class="hc-v" style="color:var(--yellow)" id="h-a">—</div><div class="hc-l">Atenção</div></div>
-    <div class="hc"><div class="hc-v" style="color:var(--purple)" id="h-rec">—</div><div class="hc-l">Em Rec.</div></div>
     <div class="hc"><div class="hc-v" style="color:var(--orange)" id="h-alr">—</div><div class="hc-l">ALERTA</div></div>
     <div class="hc"><div class="hc-v" style="color:var(--red)" id="h-c">—</div><div class="hc-l">Crítico</div></div>
+    <span id="h-est" style="display:none"></span>
+    <span id="h-rec" style="display:none"></span>
     <button class="btn-upload" onclick="openUpload()">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 10V3M5 6l3-3 3 3M3 12h10"/></svg>
       Planilhas
@@ -55,6 +55,14 @@
       <option value="beat">Ganhou share</option><option value="miss">Perdeu share</option>
     </select></div>
   <div class="fsep"></div>
+  <div class="fg"><label>Linha</label>
+    <select id="f-linha" onchange="applyFilters()">
+      <option value="">Todas</option>
+      <option value="PRIME">PRIME</option>
+      <option value="INFINITY">INFINITY</option>
+    </select>
+  </div>
+  <div class="fsep"></div>
   <div class="fg"><label>Buscar</label>
     <input type="text" id="f-search" placeholder="Nome ou código..." oninput="applyFilters()"></div>
   <div class="ctabs">
@@ -62,6 +70,9 @@
     <button class="ctab" onclick="setTab('Saudável',this)"><span class="d6 s"></span>Saudável</button>
     <button class="ctab" onclick="setTab('Atenção',this)"><span class="d6 a"></span>Atenção</button>
     <button class="ctab" onclick="setTab('Crítico',this)"><span class="d6 c"></span>Crítico</button>
+    <button class="ctab t-neg" id="btn-neg" onclick="toggleNegFilter(this)">📉 Negativos</button>
+    <button class="ctab t-virou" id="btn-virou" onclick="toggleVirouFilter(this)">🔻 Virou Negativo</button>
+    <button class="ctab t-virou-pos" id="btn-virou-pos" onclick="toggleVirouPosFilter(this)">🔺 Virou Positivo</button>
   </div>
 </div>
 
@@ -81,24 +92,14 @@
         <div class="kl">Saudável</div><div class="ks2">PE ≥ 8%</div>
         <div class="khint">Filtrar ↓</div>
       </div>
-      <div class="kpi" id="ki-est" onclick="kpiClick('Estável','ki-est')" style="--kpi-accent:var(--blue)">
-        <div class="kv" style="color:var(--blue)" id="kv-est">—</div>
-        <div class="kl" style="color:var(--blue)">Estável</div><div class="ks2">PE 4–8% + ≥ mercado</div>
-        <div class="khint">Filtrar ↓</div>
-      </div>
       <div class="kpi ka_" id="ki-a" onclick="kpiClick('Atenção','ki-a')">
         <div class="kv" style="color:var(--yellow)" id="kv-a">—</div>
-        <div class="kl">Atenção</div><div class="ks2">PE 4–8% + abaixo mercado</div>
-        <div class="khint">Filtrar ↓</div>
-      </div>
-      <div class="kpi" id="ki-rec" onclick="kpiClick('Em Recuperação','ki-rec')" style="--kpi-accent:var(--purple)">
-        <div class="kv" style="color:var(--purple)" id="kv-rec">—</div>
-        <div class="kl" style="color:var(--purple)">Em Recuperação</div><div class="ks2">PE 0–4% + ≥ mercado</div>
+        <div class="kl">Atenção</div><div class="ks2">PE 0–8%</div>
         <div class="khint">Filtrar ↓</div>
       </div>
       <div class="kpi kn" id="ki-alr" onclick="kpiClick('ALERTA','ki-alr')">
         <div class="kv" style="color:var(--orange)" id="kv-alr">—</div>
-        <div class="kl" style="color:var(--orange)">ALERTA</div><div class="ks2">PE 0–4% ou neg. + ≥ mercado</div>
+        <div class="kl" style="color:var(--orange)">ALERTA</div><div class="ks2">PE neg. + ≥ mercado</div>
         <div class="khint">Filtrar ↓</div>
       </div>
       <div class="kpi kc" id="ki-c" onclick="kpiClick('Crítico','ki-c')">
@@ -106,6 +107,11 @@
         <div class="kl" style="color:#991b1b">Crítico</div><div class="ks2" style="color:#b91c1c">PE negativo + abaixo mercado</div>
         <div class="khint">Filtrar ↓</div>
       </div>
+      <!-- hidden placeholders to keep JS happy -->
+      <span id="ki-est" style="display:none"></span>
+      <span id="kv-est" style="display:none"></span>
+      <span id="ki-rec" style="display:none"></span>
+      <span id="kv-rec" style="display:none"></span>
     </div>
   </div>
 
@@ -119,9 +125,7 @@
   <div class="legrow">
     <span style="color:var(--muted);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Classificação:</span>
     <span class="li"><span class="d6 s"></span>Saudável</span>
-    <span class="li"><span class="d6 est"></span>Estável</span>
     <span class="li"><span class="d6 a"></span>Atenção</span>
-    <span class="li"><span class="d6 rec"></span>Em Recuperação</span>
     <span class="li"><span class="d6 alr"></span>ALERTA</span>
     <span class="li"><span class="d6 c"></span>Crítico</span>
     <div style="display:flex;align-items:center;gap:6px;padding:3px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px">
@@ -153,9 +157,9 @@
         <!-- row 1: group labels -->
         <tr class="thead-groups">
           <th colspan="4" class="tg-base"></th>
-          <th colspan="1" class="tg-vm">Venda</th>
-          <th colspan="3" class="tg-ytd gs-ytd">▸ YTD Acumulado</th>
-          <th colspan="3" class="tg-mes gs-mes">▸ Mês <span id="tg-mes-label">ABR</span></th>
+          <th colspan="1" class="tg-vm">Venda <span style="opacity:.6;font-size:9px">(DDD)</span></th>
+          <th colspan="3" class="tg-ytd gs-ytd">▸ YTD Acumulado <span style="opacity:.6;font-size:9px">(DDD)</span></th>
+          <th colspan="3" class="tg-mes gs-mes">▸ Mês <span id="tg-mes-label">ABR</span> <span style="opacity:.6;font-size:9px">(DDD)</span></th>
         </tr>
         <!-- row 2: column names -->
         <tr>
@@ -275,35 +279,19 @@
         </div>
       </div>
       <div class="legend-item">
-        <div class="legend-dot" style="background:var(--blue)"></div>
-        <div class="legend-content">
-          <h3 style="color:var(--blue)">Estável</h3>
-          <p>As vendas estão entre <b>4% e 7,9%</b> acima do mínimo necessário <b>e</b> o setor está crescendo igual ou acima do mercado. Financeiramente próximo do limite, mas com bom sinal de crescimento.</p>
-          <code>Folga 4–8%  e  Supera cresce ≥ mercado</code>
-        </div>
-      </div>
-      <div class="legend-item">
         <div class="legend-dot" style="background:var(--yellow)"></div>
         <div class="legend-content">
           <h3 style="color:var(--yellow)">Atenção</h3>
-          <p>As vendas estão entre <b>4% e 7,9%</b> acima do mínimo necessário, mas o setor está crescendo <b>abaixo do mercado</b>. A margem de segurança é pequena e o setor está perdendo espaço.</p>
-          <code>Folga 4–8%  e  Supera cresce &lt; mercado</code>
-        </div>
-      </div>
-      <div class="legend-item">
-        <div class="legend-dot" style="background:var(--purple)"></div>
-        <div class="legend-content">
-          <h3 style="color:var(--purple)">Em Recuperação</h3>
-          <p>As vendas estão entre <b>0% e 3,9%</b> acima do mínimo necessário — muito próximo do limite — <b>mas</b> o setor está crescendo acima do mercado. Ainda frágil, mas caminhando na direção certa.</p>
-          <code>Folga 0–4%  e  Supera cresce ≥ mercado</code>
+          <p>As vendas estão entre <b>0% e 7,9%</b> acima do mínimo necessário para cobrir os custos. A margem de segurança é pequena e o setor precisa de acompanhamento.</p>
+          <code>Folga 0–8% acima do Ponto de Equilíbrio</code>
         </div>
       </div>
       <div class="legend-item">
         <div class="legend-dot" style="background:var(--orange)"></div>
         <div class="legend-content">
           <h3 style="color:var(--orange)">ALERTA</h3>
-          <p>Duas situações: (1) Folga de 0–3,9% e crescendo abaixo do mercado — positivo mas frágil e perdendo terreno; (2) Vendas abaixo do mínimo necessário, mas crescendo acima do mercado — no prejuízo porém com sinal de melhora.</p>
-          <code>Folga 0–4% e Supera &lt; mercado  |  Folga negativa e Supera ≥ mercado</code>
+          <p>Vendas abaixo do mínimo necessário, mas o setor está crescendo acima do mercado — no prejuízo porém com sinal de melhora.</p>
+          <code>Folga negativa  e  Supera cresce ≥ mercado</code>
         </div>
       </div>
       <div class="legend-item">

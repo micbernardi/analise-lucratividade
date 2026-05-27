@@ -16,14 +16,15 @@ let BRASIL_LUC = {}, GR_LUC = {}, GD_LUC = {};
 const MESES = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
 const MESES_PTBR = {JAN:'JANEIRO',FEV:'FEVEREIRO',MAR:'MARÇO',ABR:'ABRIL',MAI:'MAIO',JUN:'JUNHO',JUL:'JULHO',AGO:'AGOSTO',SET:'SETEMBRO',OUT:'OUTUBRO',NOV:'NOVEMBRO',DEZ:'DEZEMBRO'};
 let activeMeses = []; // months actually in the data
+let DESEMP_BY_MES = {}; // desempenho data keyed by month: { JAN: {code: {...}}, FEV: {...}, ... }
 
 let filtered = [], sortCol = 'classificacao', sortDir = 1, page = 0;
-const PS = 30;
-let activeTab = '', kpiF = '', viewM = 'ABR';
+const PS = 100;
+let activeTab = '', kpiF = '', viewM = 'ABR', negFilter = false, virouFilter = false, virouPosFilter = false;
 
 // Upload state
 let pendingLuc = []; // File objects
-let pendingDesemp = null; // File object
+let pendingDesemp = []; // File objects (one per month)
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
@@ -51,6 +52,7 @@ function loadDataset(parsed) {
   BRASIL_LUC = parsed.brasil_luc || {};
   GR_LUC     = parsed.gr_luc     || {};
   GD_LUC     = parsed.gd_luc     || {};
+  DESEMP_BY_MES = parsed.desemp_by_mes || {};
   activeMeses = parsed.meses     || ['JAN','FEV','MAR','ABR'];
   viewM = activeMeses[activeMeses.length - 1]; // default to latest month
 
@@ -125,8 +127,44 @@ function onRegChange() {
 
 function setTab(tab, btn) {
   activeTab = tab;
-  document.querySelectorAll('.ctab').forEach(b => b.className = 'ctab');
+  negFilter = false; virouFilter = false; virouPosFilter = false;
+  document.getElementById('btn-neg')?.classList.remove('active');
+  document.getElementById('btn-virou')?.classList.remove('active');
+  document.getElementById('btn-virou-pos')?.classList.remove('active');
+  document.querySelectorAll('.ctab').forEach(b => {
+    if (!['btn-neg','btn-virou','btn-virou-pos'].includes(b.id)) b.className = 'ctab';
+  });
   btn.className = 'ctab ' + (!tab ? 't-all' : tab === 'Saudável' ? 't-s' : tab === 'Atenção' ? 't-a' : 't-c');
+  applyFilters();
+}
+
+function toggleNegFilter(btn) {
+  negFilter = !negFilter;
+  if (negFilter) { virouFilter = false; virouPosFilter = false; activeTab = ''; }
+  btn.classList.toggle('active', negFilter);
+  document.getElementById('btn-virou')?.classList.remove('active');
+  document.getElementById('btn-virou-pos')?.classList.remove('active');
+  document.querySelectorAll('.ctab:not(#btn-neg):not(#btn-virou):not(#btn-virou-pos)').forEach(b => b.className = 'ctab');
+  applyFilters();
+}
+
+function toggleVirouFilter(btn) {
+  virouFilter = !virouFilter;
+  if (virouFilter) { negFilter = false; virouPosFilter = false; activeTab = ''; }
+  btn.classList.toggle('active', virouFilter);
+  document.getElementById('btn-neg')?.classList.remove('active');
+  document.getElementById('btn-virou-pos')?.classList.remove('active');
+  document.querySelectorAll('.ctab:not(#btn-neg):not(#btn-virou):not(#btn-virou-pos)').forEach(b => b.className = 'ctab');
+  applyFilters();
+}
+
+function toggleVirouPosFilter(btn) {
+  virouPosFilter = !virouPosFilter;
+  if (virouPosFilter) { negFilter = false; virouFilter = false; activeTab = ''; }
+  btn.classList.toggle('active', virouPosFilter);
+  document.getElementById('btn-neg')?.classList.remove('active');
+  document.getElementById('btn-virou')?.classList.remove('active');
+  document.querySelectorAll('.ctab:not(#btn-neg):not(#btn-virou):not(#btn-virou-pos)').forEach(b => b.className = 'ctab');
   applyFilters();
 }
 
@@ -137,7 +175,29 @@ function setVM(m) {
   // Update group header label too
   const tgMes = document.getElementById('tg-mes-label');
   if (tgMes) tgMes.textContent = m;
-  renderTable();
+  // Inject desempenho data for the selected month into SETORES
+  if (DESEMP_BY_MES && DESEMP_BY_MES[m]) {
+    const dp = DESEMP_BY_MES[m];
+    SETORES.forEach(s => {
+      const d = dp[s.code] || {};
+      // Clear existing desemp fields first
+      ['ytd','abrabr','abramar'].forEach(prefix => {
+        ['merc_ant','merc_atual','merc_var','sup_ant','sup_atual','sup_var','share_ant','share_atual','share_var'].forEach(f => {
+          s[`${prefix}_${f}`] = null;
+        });
+      });
+      Object.assign(s, d);
+      // venda_media will be recalculated below
+    });
+    // Also update venda_media for the selected month
+    const nMesesMap = {JAN:1,FEV:2,MAR:3,ABR:4,MAI:5,JUN:6,JUL:7,AGO:8,SET:9,OUT:10,NOV:11,DEZ:12};
+    const nMeses = nMesesMap[m] || 1;
+    SETORES.forEach(s => {
+      const d = dp[s.code] || {};
+      s.venda_media = d.ytd_sup_atual != null ? d.ytd_sup_atual / nMeses : null;
+    });
+  }
+  applyFilters();
 }
 
 // KPI click — no scroll, only data update
@@ -148,9 +208,7 @@ function kpiClick(f, id) {
   document.getElementById(id).classList.add('ka');
   const labels = {
     'Saudável'        : '● Saudável',
-    'Estável'         : '● Estável',
     'Atenção'         : '● Atenção',
-    'Em Recuperação'  : '● Em Recuperação',
     'ALERTA'          : '● ALERTA',
     'Crítico'         : '● Crítico',
   };
@@ -174,8 +232,23 @@ function getBase() {
   const neg   = parseInt(document.getElementById('f-neg').value) || 0;
   const share = document.getElementById('f-share').value;
   const srch  = document.getElementById('f-search').value.toLowerCase().trim();
+  const prevM = (() => {
+    const idx = activeMeses.indexOf(viewM);
+    return idx > 0 ? activeMeses[idx - 1] : null;
+  })();
   return SETORES.filter(s => {
     if (activeTab && s.classificacao !== activeTab) return false;
+    if (negFilter && (s['luc_' + viewM] == null || s['luc_' + viewM] >= 0)) return false;
+    const linhaVal = document.getElementById('f-linha')?.value || '';
+    if (linhaVal && s.linha !== linhaVal) return false;
+    if (virouFilter) {
+      const cur = s['luc_' + viewM], prev = prevM ? s['luc_' + prevM] : null;
+      if (cur == null || prev == null || !(prev >= 0 && cur < 0)) return false;
+    }
+    if (virouPosFilter) {
+      const cur = s['luc_' + viewM], prev = prevM ? s['luc_' + prevM] : null;
+      if (cur == null || prev == null || !(prev < 0 && cur >= 0)) return false;
+    }
     if (reg && s.regional !== reg) return false;
     if (dist && s.distrital !== dist) return false;
     if (neg === 4 && s.n_neg < 4) return false;
@@ -218,9 +291,9 @@ function sortBy(col) {
 function updateHdr(base) {
   document.getElementById('h-tot').textContent = base.length;
   document.getElementById('h-s').textContent   = base.filter(x => x.sub_class === 'Saudável' || x.sub_class === 'Excelente').length;
-  document.getElementById('h-est').textContent = base.filter(x => x.sub_class === 'Estável').length;
+  document.getElementById('h-est').textContent = 0;
   document.getElementById('h-a').textContent   = base.filter(x => x.sub_class === 'Atenção' || x.sub_class === 'Atenção ao Mercado').length;
-  document.getElementById('h-rec').textContent = base.filter(x => x.sub_class === 'Em Recuperação').length;
+  document.getElementById('h-rec').textContent = 0;
   document.getElementById('h-alr').textContent = base.filter(x => x.sub_class === 'ALERTA').length;
   document.getElementById('h-c').textContent   = base.filter(x => x.sub_class === 'Crítico').length;
 }
@@ -229,9 +302,9 @@ function updateKPIs(base) {
   if (!base.length) return;
   const lastM = activeMeses[activeMeses.length - 1];
   document.getElementById('kv-s').textContent   = base.filter(x => x.sub_class === 'Saudável' || x.sub_class === 'Excelente').length;
-  document.getElementById('kv-est').textContent = base.filter(x => x.sub_class === 'Estável').length;
+  document.getElementById('kv-est').textContent = 0;
   document.getElementById('kv-a').textContent   = base.filter(x => x.sub_class === 'Atenção' || x.sub_class === 'Atenção ao Mercado').length;
-  document.getElementById('kv-rec').textContent = base.filter(x => x.sub_class === 'Em Recuperação').length;
+  document.getElementById('kv-rec').textContent = 0;
   document.getElementById('kv-alr').textContent = base.filter(x => x.sub_class === 'ALERTA').length;
   document.getElementById('kv-c').textContent   = base.filter(x => x.sub_class === 'Crítico').length;
 
@@ -280,10 +353,8 @@ function renderTable() {
     const badgeCfg = {
       'Saudável':          { cls: 's',    label: 'Saudável' },
       'Excelente':         { cls: 's',    label: 'Saudável' },
-      'Estável':           { cls: 'est',  label: 'Estável' },
       'Atenção':           { cls: 'a',    label: 'Atenção' },
       'Atenção ao Mercado':{ cls: 'a',    label: 'Atenção' },
-      'Em Recuperação':    { cls: 'rec',  label: 'Em Recuperação' },
       'ALERTA':            { cls: 'alr',  label: 'ALERTA' },
       'Crítico':           { cls: 'c',    label: 'Crítico' },
     };
@@ -337,20 +408,20 @@ function renderTable() {
 
     // ⭐ star indicator for neg but gaining share
     const sv2 = s.abrabr_share_var, spv = s.abrabr_sup_var, mv2 = s.abrabr_merc_var;
-    const hasStar = s['luc_' + activeMeses[activeMeses.length-1]] < 0 && (sv2||0) > 0 && spv != null && mv2 != null && spv > mv2;
+    const hasStar = s['luc_' + viewM] < 0 && (sv2||0) > 0 && spv != null && mv2 != null && spv > mv2;
 
     return `<tr>
-      <td class="c-setor"><div class="sn">${s.nome}</div><div class="sc">${s.code}</div></td>
+      <td class="c-setor"><div class="sn">${s.nome}</div><div class="sc">${s.code}${s.linha ? `<span class="linha-badge lb-${s.linha.toLowerCase()}">${s.linha}</span>` : ''}</div></td>
       <td class="c-hier"><div class="hier-r">${s.regional_nome}</div><div class="hier-d">${s.distrital_nome}</div></td>
       <td class="c-class">${badge}</td>
       <td class="c-luc"><span class="lp ${lvC}">${lvS != null ? fp(lvS) : '—'}</span><div class="mw">${dots}</div></td>
       <td class="c-vm sup-col">${vHtml}</td>
       <td class="c-sytd sup-col gs-ytd">${vp(s.ytd_sup_var)}</td>
       <td class="c-mytd">${vp(s.ytd_merc_var)}</td>
-      <td class="c-shytd sh-col">${fShare(s.ytd_sup_var, s.ytd_merc_var)}</td>
+      <td class="c-shytd sh-col">${fShare(s.ytd_share_var)}</td>
       <td class="c-sabr mes-col gs-mes">${vp(s.abrabr_sup_var)}</td>
       <td class="c-mabr mes-col">${vp(s.abrabr_merc_var)}</td>
-      <td class="c-shabr sh-col mes-col">${fShare(s.abrabr_sup_var, s.abrabr_merc_var)}${hasStar ? '<span style="font-size:11px"> ⭐</span>' : ''}</td>
+      <td class="c-shabr sh-col mes-col">${fShare(s.abrabr_share_var)}${hasStar ? '<span style="font-size:11px"> ⭐</span>' : ''}</td>
     </tr>`;
   }).join('');
   renderPag();
@@ -417,7 +488,7 @@ window.addEventListener('resize', updateStickyTop);
 // ── UPLOAD PANEL ──────────────────────────────────────────────────────────────
 function openUpload() {
   pendingLuc = [];
-  pendingDesemp = null;
+  pendingDesemp = [];
   renderFileList('luc');
   renderFileList('desemp');
   document.getElementById('upload-overlay').classList.add('show');
@@ -453,7 +524,9 @@ function addFiles(files, type) {
       if (!pendingLuc.find(x => x.name === f.name)) pendingLuc.push(f);
     });
   } else {
-    pendingDesemp = arr[0] || null;
+    arr.forEach(f => {
+      if (!pendingDesemp.find(x => x.name === f.name)) pendingDesemp.push(f);
+    });
   }
   renderFileList(type);
   updateProcessBtn();
@@ -461,7 +534,7 @@ function addFiles(files, type) {
 
 function renderFileList(type) {
   const list  = document.getElementById(type + '-list');
-  const items = type === 'luc' ? pendingLuc : (pendingDesemp ? [pendingDesemp] : []);
+  const items = type === 'luc' ? pendingLuc : pendingDesemp;
 
   if (!items.length) {
     // Show currently saved files info
@@ -469,7 +542,7 @@ function renderFileList(type) {
       const saved = localStorage.getItem('supera_data');
       if (saved) {
         const p = JSON.parse(saved);
-        const savedFiles = type === 'luc' ? (p.sourceFiles?.luc || []) : (p.sourceFiles?.desemp ? [p.sourceFiles.desemp] : []);
+        const savedFiles = type === 'luc' ? (p.sourceFiles?.luc || []) : (p.sourceFiles?.desemp || []);
         if (savedFiles.length) {
           list.innerHTML = savedFiles.map(n => `
             <div class="file-item ok">
@@ -490,15 +563,15 @@ function renderFileList(type) {
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="1" width="10" height="14" rx="1.5"/><path d="M5 5h6M5 8h6M5 11h4"/></svg>
       <span class="fname">${f.name}</span>
       <span class="ftype">XLSX</span>
-      <span onclick="${type==='luc'?`removeLuc(${i})`:'removeDesemp()'}" style="cursor:pointer;color:var(--muted);font-size:11px;padding:0 4px">✕</span>
+      <span onclick="${type==='luc'?`removeLuc(${i})`:`removeDesemp(${i})`}" style="cursor:pointer;color:var(--muted);font-size:11px;padding:0 4px">✕</span>
     </div>`).join('');
 }
 
-function removeLuc(i)    { pendingLuc.splice(i, 1); renderFileList('luc'); updateProcessBtn(); }
-function removeDesemp()  { pendingDesemp = null; renderFileList('desemp'); updateProcessBtn(); }
+function removeLuc(i)        { pendingLuc.splice(i, 1); renderFileList('luc'); updateProcessBtn(); }
+function removeDesemp(i)     { pendingDesemp.splice(i, 1); renderFileList('desemp'); updateProcessBtn(); }
 
 function updateProcessBtn() {
-  document.getElementById('btn-process').disabled = !(pendingLuc.length > 0 && pendingDesemp);
+  document.getElementById('btn-process').disabled = !(pendingLuc.length > 0 && pendingDesemp.length > 0);
 }
 
 // ── XLSX PROCESSING ───────────────────────────────────────────────────────────
@@ -518,7 +591,7 @@ async function processFiles() {
     const lucData = {}; // { 'JAN': { code: {luc, lucro, sup_ytd, mkt_ytd, nome, reg, dist} } }
     const regMap = {}, distMap = {};
     const brasilLucMap = {}, grLucMap = {}, gdLucMap = {}; // consolidated luc by level
-    const fileNames = { luc: pendingLuc.map(f => f.name), desemp: pendingDesemp.name };
+    const fileNames = { luc: pendingLuc.map(f => f.name), desemp: pendingDesemp.map(f => f.name) };
 
     for (const file of pendingLuc) {
       msg.textContent = `Processando ${file.name}…`;
@@ -582,9 +655,11 @@ async function processFiles() {
           distMap[dcode] = fdv.replace(/^\d+\s*-\s*/, '').trim();
         }
 
+        const linha = String(row[3] || '').trim().toUpperCase();
         lucData[mes][code] = {
           nome, reg: reg.replace('.0','').padStart(6,'0'),
           dist: dist.replace('.0','').padStart(6,'0'),
+          linha: linha || null,
           luc:       safeNum(row[lucIdx]),
           lucro:     safeNum(row[lucRIdx]),
           sup_ytd:   safeNum(row[supIdx]),
@@ -598,78 +673,99 @@ async function processFiles() {
 
     // GR/GD names and consolidated luc already extracted inline above
 
-    // ── 2. Read desempenho ────────────────────────────────────────────────────
-    msg.textContent = 'Processando planilha de desempenho…';
+    // ── 2. Read desempenho files (one per month) ──────────────────────────────
+    msg.textContent = 'Processando planilhas de desempenho…';
     await sleep(50);
 
-    const wb2    = XLSX.read(await pendingDesemp.arrayBuffer(), { type: 'array' });
-    const desemp = {};
-    const allSheets = wb2.SheetNames;
-    // Detect sheet names dynamically: YTD, MÊS X MÊS (same month YoY), MÊS X MÊS-1 (vs prev month)
-    const ytdSheet   = allSheets.find(s => s === 'YTD') || null;
-    // MêsXMês = same month vs last year: "ABR X ABR", "MAR X MAR" — both halves equal
-    const mesXmesSheet = allSheets.find(s => {
-      const p = s.split(' X ');
-      return p.length === 2 && p[0].trim() === p[1].trim() && p[0].trim().length === 3;
-    }) || null;
-    // MêsXMês-1 = current month vs previous month: "ABR X MAR", "MAR X FEV" — halves differ
-    const mesXprevSheet = allSheets.find(s => {
-      const p = s.split(' X ');
-      return p.length === 2 && p[0].trim() !== p[1].trim() && p[0].trim().length === 3 && p[1].trim().length === 3;
-    }) || null;
-    // Prefixes for field naming: always use standard names regardless of actual month
-    // Detect current month from mesXmesSheet name ("ABR X ABR" → "ABR" → 4 months)
+    const desempByMes = {}; // { 'JAN': { code: {...} }, 'FEV': {...}, ... }
+    let lastDesempMes = null;
+    let nMeses = 1;
+
     const MESES_ABR = {JAN:1,FEV:2,MAR:3,ABR:4,MAI:5,JUN:6,JUL:7,AGO:8,SET:9,OUT:10,NOV:11,DEZ:12};
-    const currentMesAbbr = mesXmesSheet ? mesXmesSheet.split(' X ')[0].trim() : null;
-    const nMeses = currentMesAbbr ? (MESES_ABR[currentMesAbbr] || 1) : 1;
 
-    const sheetMap = [
-      [ytdSheet,      'ytd'],
-      [mesXmesSheet,  'abrabr'],   // current month vs same month last year
-      [mesXprevSheet, 'abramar'],  // current month vs previous month
-    ];
-    for (const [sheet, prefix] of sheetMap) {
-      const ws2 = sheet ? wb2.Sheets[sheet] : null;
-      if (!ws2) continue;
-      const rows2 = XLSX.utils.sheet_to_json(ws2, { header: 1 });
-      // Find header row (row with CARGO)
-      let hRow = 0;
-      for (let r = 0; r < rows2.length; r++) {
-        if (rows2[r].includes('CARGO')) { hRow = r; break; }
+    for (const desempFile of pendingDesemp) {
+      msg.textContent = `Processando ${desempFile.name}…`;
+      await sleep(30);
+
+      const wb2    = XLSX.read(await desempFile.arrayBuffer(), { type: 'array' });
+      const desemp = {};
+      const allSheets = wb2.SheetNames;
+      // Detect sheet names dynamically
+      const ytdSheet   = allSheets.find(s => s === 'YTD') || null;
+      const mesXmesSheet = allSheets.find(s => {
+        const p = s.split(' X ');
+        return p.length === 2 && p[0].trim() === p[1].trim() && p[0].trim().length === 3;
+      }) || null;
+      const mesXprevSheet = allSheets.find(s => {
+        const p = s.split(' X ');
+        return p.length === 2 && p[0].trim() !== p[1].trim() && p[0].trim().length === 3 && p[1].trim().length === 3;
+      }) || null;
+
+      // Detect month from mesXmesSheet or file name
+      const currentMesAbbr = mesXmesSheet
+        ? mesXmesSheet.split(' X ')[0].trim()
+        : detectMes(desempFile.name);
+      const fileMesN = currentMesAbbr ? (MESES_ABR[currentMesAbbr] || 1) : 1;
+
+      const sheetMap = [
+        [ytdSheet,      'ytd'],
+        [mesXmesSheet,  'abrabr'],
+        [mesXprevSheet, 'abramar'],
+      ];
+      for (const [sheet, prefix] of sheetMap) {
+        const ws2 = sheet ? wb2.Sheets[sheet] : null;
+        if (!ws2) continue;
+        const rows2 = XLSX.utils.sheet_to_json(ws2, { header: 1 });
+        let hRow = 0;
+        for (let r = 0; r < rows2.length; r++) {
+          if (rows2[r].includes('CARGO')) { hRow = r; break; }
+        }
+        const h = rows2[hRow].map(c => String(c || ''));
+        const nomI  = h.indexOf('NOME');
+        const carI  = h.indexOf('CARGO');
+        const maNI  = h.indexOf('MERC. ANT');
+        const maCI  = h.indexOf('MERC. ATUAL');
+        const mvI   = h.findIndex((c,i)=>c==='VARIAÇÃO %'&&i>0);
+        const saNI  = h.indexOf('SUP. ANT');
+        const saCI  = h.indexOf('SUP. ATUAL');
+        const svI   = h.findIndex((c,i)=>c.startsWith('VARIAÇÃO')&&i>saNI);
+        const shaNI = h.indexOf('SHARE ANT.');
+        const shaCI = h.indexOf('SHARE ATUAL');
+        // Share var: always the column immediately after SHARE ATUAL
+        const shvI  = shaCI >= 0 ? shaCI + 1 : -1;
+
+        for (let r = hRow + 1; r < rows2.length; r++) {
+          const row = rows2[r];
+          if (String(row[carI]||'').trim() !== 'PV') continue;
+          const nom = String(row[nomI]||'').trim();
+          const code = nom.match(/^(\d+)/)?.[1];
+          if (!code) continue;
+          if (!desemp[code]) desemp[code] = {};
+          desemp[code][`${prefix}_merc_ant`]   = safeNum(row[maNI]);
+          desemp[code][`${prefix}_merc_atual`] = safeNum(row[maCI]);
+          desemp[code][`${prefix}_merc_var`]   = safeNum(row[mvI]);
+          desemp[code][`${prefix}_sup_ant`]    = safeNum(row[saNI]);
+          desemp[code][`${prefix}_sup_atual`]  = safeNum(row[saCI]);
+          desemp[code][`${prefix}_sup_var`]    = safeNum(row[svI]);
+          desemp[code][`${prefix}_share_ant`]  = safeNum(row[shaNI]);
+          desemp[code][`${prefix}_share_atual`]= safeNum(row[shaCI]);
+          desemp[code][`${prefix}_share_var`]  = safeNum(row[shvI]);
+        }
       }
-      const h = rows2[hRow].map(c => String(c || ''));
-      const nomI  = h.indexOf('NOME');
-      const carI  = h.indexOf('CARGO');
-      const maNI  = h.indexOf('MERC. ANT');
-      const maCI  = h.indexOf('MERC. ATUAL');
-      const mvI   = h.findIndex((c,i)=>c==='VARIAÇÃO %'&&i>0);
-      const saNI  = h.indexOf('SUP. ANT');
-      const saCI  = h.indexOf('SUP. ATUAL');
-      const svI   = h.findIndex((c,i)=>c.startsWith('VARIAÇÃO')&&i>saNI);
-      const shaNI = h.indexOf('SHARE ANT.');
-      const shaCI = h.indexOf('SHARE ATUAL');
-      const shvI  = h.findIndex((c,i)=>c.startsWith('VARIAÇÃO')&&i>shaNI);
 
-      // prefix already set from sheetMap
-
-      for (let r = hRow + 1; r < rows2.length; r++) {
-        const row = rows2[r];
-        if (String(row[carI]||'').trim() !== 'PV') continue;
-        const nom = String(row[nomI]||'').trim();
-        const code = nom.match(/^(\d+)/)?.[1];
-        if (!code) continue;
-        if (!desemp[code]) desemp[code] = {};
-        desemp[code][`${prefix}_merc_ant`]   = safeNum(row[maNI]);
-        desemp[code][`${prefix}_merc_atual`] = safeNum(row[maCI]);
-        desemp[code][`${prefix}_merc_var`]   = safeNum(row[mvI]);
-        desemp[code][`${prefix}_sup_ant`]    = safeNum(row[saNI]);
-        desemp[code][`${prefix}_sup_atual`]  = safeNum(row[saCI]);
-        desemp[code][`${prefix}_sup_var`]    = safeNum(row[svI]);
-        desemp[code][`${prefix}_share_ant`]  = safeNum(row[shaNI]);
-        desemp[code][`${prefix}_share_atual`]= safeNum(row[shaCI]);
-        desemp[code][`${prefix}_share_var`]  = safeNum(row[shvI]);
+      // Store by detected month
+      if (currentMesAbbr) {
+        desempByMes[currentMesAbbr] = desemp;
+        // Track latest desempenho month
+        if (!lastDesempMes || fileMesN > (MESES_ABR[lastDesempMes] || 0)) {
+          lastDesempMes = currentMesAbbr;
+          nMeses = fileMesN;
+        }
       }
     }
+
+    // Use latest desempenho file as the base for current setores data
+    const desemp = desempByMes[lastDesempMes] || {};
 
     // ── 3. Merge into setores ────────────────────────────────────────────────
     msg.textContent = 'Calculando lucratividade e classificações…';
@@ -687,8 +783,11 @@ async function processFiles() {
       for (const m of sortedMeses) {
         if (lucData[m][code]) { nome = lucData[m][code].nome; reg = lucData[m][code].reg; dist = lucData[m][code].dist; break; }
       }
-
-      const s = { code, nome, regional: reg, distrital: dist };
+      let linha = '';
+      for (const m of sortedMeses) {
+        if (lucData[m][code]?.linha) { linha = lucData[m][code].linha; break; }
+      }
+      const s = { code, nome, regional: reg, distrital: dist, linha };
 
       // Per-month luc values
       let prevYtd = 0;
@@ -775,13 +874,13 @@ async function processFiles() {
         s.sub_class     = 'Saudável';
       } else if (intermediario_fin && acima_merc) {
         s.classificacao = 'Atenção';
-        s.sub_class     = 'Estável';
+        s.sub_class     = 'Atenção';
       } else if (intermediario_fin && !acima_merc) {
         s.classificacao = 'Atenção';
         s.sub_class     = 'Atenção';
       } else if (fragil_fin && folga_pe >= 0 && acima_merc) {
         s.classificacao = 'Atenção';
-        s.sub_class     = 'Em Recuperação';
+        s.sub_class     = 'Atenção';
       } else if (fragil_fin && folga_pe >= 0 && !acima_merc) {
         s.classificacao = 'Atenção';
         s.sub_class     = 'ALERTA';
@@ -808,6 +907,7 @@ async function processFiles() {
       gr_luc: grLucMap,
       gd_luc: gdLucMap,
       meses: sortedMeses,
+      desemp_by_mes: desempByMes,
       sourceFiles: fileNames,
       savedAt: new Date().toISOString(),
     };
@@ -824,6 +924,17 @@ async function processFiles() {
         }
         return r;
       });
+      // Slim desemp_by_mes: only keep ytd and abrabr (drop abramar) to save space
+      slim.desemp_by_mes = {};
+      for (const [mes, dp] of Object.entries(desempByMes)) {
+        slim.desemp_by_mes[mes] = {};
+        for (const [code, d] of Object.entries(dp)) {
+          slim.desemp_by_mes[mes][code] = {};
+          for (const k of Object.keys(d)) {
+            if (!k.startsWith('abramar_')) slim.desemp_by_mes[mes][code][k] = d[k];
+          }
+        }
+      }
       localStorage.setItem('supera_data', JSON.stringify(slim));
     }
 
@@ -852,7 +963,9 @@ function clearAllData() {
   localStorage.removeItem('supera_data');
   SETORES = []; REGIONAIS = {}; DISTRITAIS = {};
   BRASIL_LUC = {}; GR_LUC = {}; GD_LUC = {};
-  activeMeses = []; filtered = [];
+  DESEMP_BY_MES = {}; activeMeses = []; filtered = [];
+  pendingLuc = []; pendingDesemp = []; negFilter = false; virouFilter = false; virouPosFilter = false;
+  const fLinha = document.getElementById('f-linha'); if (fLinha) fLinha.value = '';
   // Reset header counts
   ['h-tot','h-s','h-a','h-c'].forEach(id => document.getElementById(id).textContent = '—');
   ['kv-s','kv-a','kv-c','kv-ns'].forEach(id => { const el=document.getElementById(id); if(el) el.textContent='—'; });
@@ -974,14 +1087,14 @@ function fp(v)   { if (v == null) return '—'; return (v * 100).toFixed(2) + '%
 function fBRL(v) { if (v == null) return '—'; return 'R$ ' + Math.round(v).toLocaleString('pt-BR'); }
 
 // Var. Share = Var. Supera% - Var. Mercado% (positivo=verde, negativo=vermelho)
-function fShare(supVar, mercVar) {
-  if (supVar == null || mercVar == null) return '<span style="color:var(--muted)">—</span>';
-  const diff    = supVar - mercVar;
-  const neutral = Math.abs(diff) < 0.0005;
-  const pos     = diff > 0;
+// fShare now receives the share_var value directly (read from spreadsheet)
+function fShare(shareVar) {
+  if (shareVar == null) return '<span style="color:var(--muted)">—</span>';
+  const neutral = Math.abs(shareVar) < 0.0005;
+  const pos     = shareVar > 0;
   const cls     = neutral ? 'fl' : pos ? 'pos' : 'neg';
   const arr     = neutral ? '→' : pos ? '▲' : '▼';
-  return '<span class="vp ' + cls + '">' + arr + ' ' + (diff * 100).toFixed(2) + '%</span>';
+  return '<span class="vp ' + cls + '">' + arr + ' ' + (shareVar * 100).toFixed(2) + '%</span>';
 }
 
 // ── LEGEND MODAL ──────────────────────────────────────────────────────────────
