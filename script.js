@@ -37,8 +37,11 @@ function setLinha(e, val) {
   document.getElementById('linha-dd').classList.remove('open');
   applyFilters();
 }
-// Close dropdown when clicking outside
-document.addEventListener('click', () => document.getElementById('linha-dd')?.classList.remove('open'));
+// Close dropdowns when clicking outside
+document.addEventListener('click', () => {
+  document.getElementById('linha-dd')?.classList.remove('open');
+  document.getElementById('luc-linha-dd')?.classList.remove('open');
+});
 
 // Upload state
 let pendingLuc = []; // File objects
@@ -95,6 +98,10 @@ function loadDataset(parsed) {
   // Show table, hide no-data
   document.getElementById('no-data').classList.remove('show');
   document.getElementById('twrap').style.display = '';
+  const btnExp = document.getElementById('btn-export');
+  if (btnExp) btnExp.style.display = '';
+  lucViewM = viewM; // sync luc month to current month
+  if (currentView === 'luc') { syncLucFilters(); renderLuc(); }
 
   // Populate regional filter
   const fReg = document.getElementById('f-reg');
@@ -1113,6 +1120,456 @@ function fShare(shareVar) {
   const cls     = neutral ? 'fl' : pos ? 'pos' : 'neg';
   const arr     = neutral ? '→' : pos ? '▲' : '▼';
   return '<span class="vp ' + cls + '">' + arr + ' ' + (shareVar * 100).toFixed(2) + '%</span>';
+}
+
+// ── EXPORT EXCEL ─────────────────────────────────────────────────────────────
+function exportExcel() {
+  if (!window.XLSX) { alert('Aguarde o carregamento da biblioteca XLSX...'); return; }
+  if (!filtered.length) { alert('Nenhum setor para exportar com os filtros atuais.'); return; }
+
+  const wb = XLSX.utils.book_new();
+
+  // ── Build data rows ──────────────────────────────────────────────────────
+  const mesLabel = viewM;
+  const prevM = (() => { const i = activeMeses.indexOf(viewM); return i > 0 ? activeMeses[i-1] : null; })();
+
+  const headers = [
+    'Setor', 'Código', 'Linha', 'Regional', 'Distrital', 'Classificação',
+    `Luc. ${mesLabel}`,
+    'Venda Média Mensal',
+    'YTD Var. Supera%', 'YTD Var. Mercado%', 'YTD Var. Share',
+    `${mesLabel} Var. Supera%`, `${mesLabel} Var. Mercado%`, `${mesLabel} Var. Share`,
+    'Meses Negativos',
+  ];
+  activeMeses.forEach(m => headers.push(`Luc. ${m}`));
+
+  const rows = filtered.map(s => {
+    const row = [
+      s.nome,
+      s.code,
+      s.linha || '',
+      s.regional_nome || '',
+      s.distrital_nome || '',
+      s.sub_class || s.classificacao,
+      s['luc_' + viewM] != null ? s['luc_' + viewM] : '',
+      s.venda_media != null ? s.venda_media : '',
+      s.ytd_sup_var  != null ? s.ytd_sup_var  : '',
+      s.ytd_merc_var != null ? s.ytd_merc_var : '',
+      s.ytd_share_var != null ? s.ytd_share_var : '',
+      s.abrabr_sup_var  != null ? s.abrabr_sup_var  : '',
+      s.abrabr_merc_var != null ? s.abrabr_merc_var : '',
+      s.abrabr_share_var != null ? s.abrabr_share_var : '',
+      s.n_neg || 0,
+    ];
+    activeMeses.forEach(m => row.push(s['luc_' + m] != null ? s['luc_' + m] : ''));
+    return row;
+  });
+
+  const wsData = [headers, ...rows];
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+  // ── Column widths ────────────────────────────────────────────────────────
+  ws['!cols'] = [
+    {wch:32},{wch:9},{wch:10},{wch:22},{wch:26},{wch:16},
+    {wch:10},{wch:18},
+    {wch:14},{wch:16},{wch:14},
+    {wch:14},{wch:16},{wch:14},
+    {wch:8},
+    ...activeMeses.map(()=>({wch:10})),
+  ];
+
+  // ── Styles via cell-level properties (xlsx supports limited styling) ─────
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  const nCols = headers.length;
+
+  // Header row styling
+  for (let c = 0; c < nCols; c++) {
+    const cell = ws[XLSX.utils.encode_cell({r:0, c})];
+    if (!cell) continue;
+    cell.s = {
+      font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11, name: 'Arial' },
+      fill: { fgColor: { rgb: '1E3A5F' } },
+      alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+      border: { bottom: { style: 'thin', color: { rgb: '93C5FD' } } },
+    };
+  }
+
+  // Classification color map
+  const classColors = {
+    'Saudável':       { bg: 'D1FAE5', fg: '065F46' },
+    'Excelente':      { bg: 'D1FAE5', fg: '065F46' },
+    'Atenção':        { bg: 'FEF9C3', fg: '92400E' },
+    'ALERTA':         { bg: 'FFEDD5', fg: '9A3412' },
+    'Crítico':        { bg: 'FEE2E2', fg: '991B1B' },
+  };
+
+  // Data rows styling
+  for (let r = 1; r <= filtered.length; r++) {
+    const s = filtered[r-1];
+    const isEven = r % 2 === 0;
+    const rowBg = isEven ? 'F8FAFC' : 'FFFFFF';
+
+    for (let c = 0; c < nCols; c++) {
+      const addr = XLSX.utils.encode_cell({r, c});
+      if (!ws[addr]) ws[addr] = { t: 'z', v: '' };
+      const cell = ws[addr];
+
+      // Base style
+      cell.s = {
+        font: { sz: 10, name: 'Arial' },
+        fill: { fgColor: { rgb: rowBg } },
+        alignment: { vertical: 'center' },
+        border: { bottom: { style: 'thin', color: { rgb: 'E2E8F0' } } },
+      };
+
+      // Classification column — colored
+      if (c === 5) {
+        const cc = classColors[cell.v] || {};
+        if (cc.bg) {
+          cell.s.fill = { fgColor: { rgb: cc.bg } };
+          cell.s.font = { sz: 10, name: 'Arial', bold: true, color: { rgb: cc.fg } };
+          cell.s.alignment = { horizontal: 'center', vertical: 'center' };
+        }
+      }
+
+      // Percentage columns — format as % and color pos/neg
+      const pctCols = [6, 8, 9, 10, 11, 12, 13];
+      const lucStartCol = 15;
+      const isLucCol = c >= lucStartCol;
+      if (pctCols.includes(c) || isLucCol) {
+        if (cell.v !== '' && cell.v != null) {
+          cell.t = 'n';
+          cell.z = '0.00%';
+          const val = parseFloat(cell.v);
+          const color = val >= 0 ? '166534' : '991B1B';
+          cell.s.font = { ...cell.s.font, color: { rgb: color }, bold: true };
+          cell.s.alignment = { ...cell.s.alignment, horizontal: 'center' };
+        }
+      }
+
+      // Currency column
+      if (c === 7) {
+        if (cell.v !== '' && cell.v != null) {
+          cell.t = 'n';
+          cell.z = 'R$ #,##0';
+          cell.s.alignment = { ...cell.s.alignment, horizontal: 'right' };
+        }
+      }
+
+      // Meses neg column — center
+      if (c === 14) {
+        cell.s.alignment = { ...cell.s.alignment, horizontal: 'center' };
+      }
+    }
+  }
+
+  // ── Freeze top row ───────────────────────────────────────────────────────
+  ws['!freeze'] = { xSplit: 0, ySplit: 1, topLeftCell: 'A2', activeCell: 'A2', sqref: 'A2' };
+
+  // ── Sheet name with active filters ──────────────────────────────────────
+  const filterParts = [];
+  filterParts.push(mesLabel);
+  if (linhaVal) filterParts.push(linhaVal);
+  if (activeTab) filterParts.push(activeTab.substring(0,4));
+  if (negFilter) filterParts.push('NEG');
+  if (virouFilter) filterParts.push('VIROU-');
+  if (virouPosFilter) filterParts.push('VIROU+');
+  const sheetName = ('Setores_' + filterParts.join('_')).substring(0, 31);
+
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
+  // ── Download ─────────────────────────────────────────────────────────────
+  const dateStr = new Date().toLocaleDateString('pt-BR').replace(/\//g,'-');
+  XLSX.writeFile(wb, `SUPERA_${sheetName}_${dateStr}.xlsx`);
+}
+
+// ── LUCRATIVIDADE VIEW ────────────────────────────────────────────────────────
+let currentView = 'geral';
+let lucViewM = 'ABR';
+let lucLinhaVal = '';
+let lucNegFilter = false, lucVirouFilter = false, lucVirouPosFilter = false;
+let lucFocusedCol = null; // which column is expanded
+let lucSortDir = 'desc';  // 'desc' = maior para menor, 'asc' = menor para maior
+
+function switchView(v) {
+  currentView = v;
+  document.getElementById('view-luc').style.display = v === 'luc' ? '' : 'none';
+  // Hide/show geral sections
+  ['fbar','main-geral'].forEach(id => {
+    const el = document.getElementById(id) || document.querySelector('.' + id);
+  });
+  const geralSections = document.querySelectorAll('.fbar, .main');
+  geralSections.forEach(el => {
+    if (!el.closest('#view-luc')) el.style.display = v === 'geral' ? '' : 'none';
+  });
+  document.getElementById('vt-geral').classList.toggle('active', v === 'geral');
+  document.getElementById('vt-luc').classList.toggle('active', v === 'luc');
+  if (v === 'luc') {
+    syncLucFilters();
+    renderLuc();
+  }
+}
+
+function syncLucFilters() {
+  // Sync month buttons
+  const msel = document.getElementById('luc-msel');
+  msel.innerHTML = '';
+  activeMeses.forEach(m => {
+    const b = document.createElement('button');
+    b.className = 'mb' + (m === lucViewM ? ' ma' : '');
+    b.textContent = m;
+    b.onclick = () => { lucViewM = m; msel.querySelectorAll('.mb').forEach(x=>x.classList.toggle('ma',x.textContent===m)); renderLuc(); };
+    msel.appendChild(b);
+  });
+  // Sync regional filter
+  const lReg = document.getElementById('lf-reg');
+  lReg.innerHTML = '<option value="">Todas</option>';
+  Object.entries(REGIONAIS).forEach(([code,name]) => {
+    const o = document.createElement('option'); o.value=code; o.textContent=name; lReg.appendChild(o);
+  });
+}
+
+function onLucRegChange() {
+  const reg = document.getElementById('lf-reg').value;
+  const fd = document.getElementById('lf-dist');
+  fd.innerHTML = '<option value="">Todas</option>';
+  const seen = new Set();
+  SETORES.forEach(s => {
+    if (reg && s.regional !== reg) return;
+    if (seen.has(s.distrital)) return;
+    seen.add(s.distrital);
+    const o = document.createElement('option');
+    o.value = s.distrital; o.textContent = s.distrital_nome; fd.appendChild(o);
+  });
+  renderLuc();
+}
+
+function focusLucCol(cls) {
+  lucFocusedCol = cls;
+  lucSortDir = 'desc';
+  applyLucFocus();
+}
+function closeLucFocus() {
+  lucFocusedCol = null;
+  const grid = document.getElementById('luc-grid');
+  if (!grid) return;
+  grid.classList.remove('has-focus');
+  grid.querySelectorAll('.luc-col').forEach(c => c.classList.remove('focused'));
+  grid.querySelectorAll('.luc-col-sort').forEach(el => el.remove());
+}
+function setLucSort(dir) {
+  lucSortDir = dir;
+  applyLucFocus();
+}
+function applyLucFocus() {
+  const grid = document.getElementById('luc-grid');
+  if (!lucFocusedCol) { closeLucFocus(); return; }
+  grid.classList.add('has-focus');
+  grid.querySelectorAll('.luc-col').forEach(col => {
+    const isFocused = col.dataset.cls === lucFocusedCol;
+    col.classList.toggle('focused', isFocused);
+    if (isFocused) {
+      // Add/update sort bar
+      let sortBar = col.querySelector('.luc-col-sort');
+      if (!sortBar) {
+        sortBar = document.createElement('div');
+        sortBar.className = 'luc-col-sort';
+        col.querySelector('.luc-col-hdr').insertAdjacentElement('afterend', sortBar);
+      }
+      sortBar.innerHTML = `
+        <span>Ordenar:</span>
+        <button class="luc-sort-btn${lucSortDir==='desc'?' active':''}" onclick="setLucSort('desc')">↓ Maior → Menor</button>
+        <button class="luc-sort-btn${lucSortDir==='asc'?' active':''}" onclick="setLucSort('asc')">↑ Menor → Maior</button>
+        <button class="luc-col-close" onclick="closeLucFocus()">✕ Fechar</button>`;
+      // Re-sort cards in body
+      const body = col.querySelector('.luc-col-body');
+      const cards = Array.from(body.querySelectorAll('.luc-card'));
+      cards.sort((a, b) => {
+        const va = parseFloat(a.dataset.lucro) || 0;
+        const vb = parseFloat(b.dataset.lucro) || 0;
+        return lucSortDir === 'desc' ? vb - va : va - vb;
+      });
+      body.innerHTML = '';
+      cards.forEach(c => body.appendChild(c));
+    }
+  });
+}
+
+function setLucFilters(neg, virou, virouPos) {
+  lucNegFilter      = neg;
+  lucVirouFilter    = virou;
+  lucVirouPosFilter = virouPos;
+  // Sync button states by ID (elements always exist in DOM)
+  const nb  = document.getElementById('lbtn-neg');
+  const vb  = document.getElementById('lbtn-virou');
+  const vpb = document.getElementById('lbtn-virou-pos');
+  if (nb)  nb.classList.toggle('active', neg);
+  if (vb)  vb.classList.toggle('active', virou);
+  if (vpb) vpb.classList.toggle('active', virouPos);
+  renderLuc();
+}
+function toggleLucNeg()      { setLucFilters(!lucNegFilter, false, false); }
+function toggleLucVirou()    { setLucFilters(false, !lucVirouFilter, false); }
+function toggleLucVirouPos() { setLucFilters(false, false, !lucVirouPosFilter); }
+
+function toggleLucLinhaDd(e) {
+  e.stopPropagation();
+  document.getElementById('luc-linha-dd').classList.toggle('open');
+}
+function setLucLinha(e, val) {
+  e.stopPropagation();
+  lucLinhaVal = val;
+  const label = document.getElementById('luc-linha-dd-label');
+  if (val === 'PRIME') label.innerHTML = '<span class="linha-badge lb-prime">PRIME</span>';
+  else if (val === 'INFINITY') label.innerHTML = '<span class="linha-badge lb-infinity">INFINITY</span>';
+  else label.textContent = 'Todas';
+  document.getElementById('luc-linha-dd').classList.remove('open');
+  renderLuc();
+}
+
+function lucClassify(lucro) {
+  if (lucro == null) return null;
+  if (lucro < 0)      return 'critico';
+  if (lucro < 10000)  return 'alerta';
+  if (lucro <= 20000) return 'atencao';
+  if (lucro < 25000)  return 'atencao-leve';
+  return 'saudavel';
+}
+
+const lucClassLabels = {
+  'critico':      'Crítico',
+  'alerta':       'Alerta',
+  'atencao':      'Atenção',
+  'atencao-leve': 'Atenção Leve',
+  'saudavel':     'Saudável',
+};
+const lucClassOrder = ['critico','alerta','atencao','atencao-leve','saudavel'];
+
+function renderLuc() {
+  if (!SETORES.length) return;
+  const reg   = document.getElementById('lf-reg').value;
+  const dist  = document.getElementById('lf-dist').value;
+  const srch  = (document.getElementById('lf-search').value||'').toLowerCase().trim();
+
+  // Filter setores
+  const prevML = (() => { const i = activeMeses.indexOf(lucViewM); return i > 0 ? activeMeses[i-1] : null; })();
+
+  let data = SETORES.filter(s => {
+    if (reg  && s.regional  !== reg)  return false;
+    if (dist && s.distrital !== dist) return false;
+    if (lucLinhaVal && s.linha !== lucLinhaVal) return false;
+    if (srch && !s.nome.toLowerCase().includes(srch) && !s.code.includes(srch)) return false;
+    // Use lucro_ (R$) if available, fallback to sign of luc_ (%)
+    const cur  = s['lucro_' + lucViewM] ?? null;
+    const curL = s['luc_'   + lucViewM] ?? null;
+    const curSign  = cur  != null ? cur  : (curL  != null ? (curL  >= 0 ? 1 : -1) : null);
+    const prev = prevML ? (s['lucro_' + prevML] ?? null) : null;
+    const prevL= prevML ? (s['luc_'   + prevML] ?? null) : null;
+    const prevSign = prev != null ? prev : (prevL != null ? (prevL >= 0 ? 1 : -1) : null);
+    if (lucNegFilter     && (curSign  == null || curSign  >= 0)) return false;
+    if (lucVirouFilter   && (curSign  == null || prevSign == null || !(prevSign >= 0 && curSign  < 0))) return false;
+    if (lucVirouPosFilter && (curSign == null || prevSign == null || !(prevSign <  0 && curSign  >= 0))) return false;
+    return true;
+  });
+
+  // Attach lucro value and class for current month
+  data = data.map(s => ({
+    ...s,
+    _lucro: s['lucro_' + lucViewM] ?? null,
+    _luc:   s['luc_'   + lucViewM] ?? null,
+    _class: lucClassify(s['lucro_' + lucViewM] ?? null),
+  })).filter(s => s._class !== null);
+
+  // Sort: critico first, then alerta, atencao, atencao-leve, saudavel; within each by lucro asc
+  data.sort((a,b) => {
+    const oi = lucClassOrder.indexOf(a._class) - lucClassOrder.indexOf(b._class);
+    if (oi !== 0) return oi;
+    return (a._lucro??0) - (b._lucro??0);
+  });
+
+  document.getElementById('luc-count').textContent = data.length + ' setores';
+
+  // Summary strip
+  const counts = {};
+  lucClassOrder.forEach(c => counts[c] = 0);
+  data.forEach(s => counts[s._class]++);
+
+  const summaryLabels = {
+    'critico':      ['Crítico','Lucro negativo'],
+    'alerta':       ['Alerta','R$0 – R$9.999'],
+    'atencao':      ['Atenção','R$10K – R$20K'],
+    'atencao-leve': ['Atenção Leve','R$20K – R$24.999'],
+    'saudavel':     ['Saudável','≥ R$25.000'],
+  };
+  document.getElementById('luc-summary').innerHTML = lucClassOrder.map(c => `
+    <div class="luc-scard lsc-${c}">
+      <div class="luc-scard-n">${counts[c]}</div>
+      <div class="luc-scard-l">${summaryLabels[c][0]}</div>
+      <div class="luc-scard-sub">${summaryLabels[c][1]}</div>
+    </div>`).join('');
+
+  // 5-column executive layout
+  const fBR = v => v == null ? '—' : (v < 0 ? '−R$ ' : 'R$ ') + Math.abs(Math.round(v)).toLocaleString('pt-BR');
+
+  const colConfig = {
+    'critico':      { title: 'Crítico',       range: 'Lucro negativo' },
+    'alerta':       { title: 'Alerta',        range: 'R$0 – R$9.999' },
+    'atencao':      { title: 'Atenção',       range: 'R$10K – R$20K' },
+    'atencao-leve': { title: 'Atenção Leve',  range: 'R$20K – R$24.999' },
+    'saudavel':     { title: 'Saudável',      range: '≥ R$25.000' },
+  };
+
+  const grid = document.getElementById('luc-grid');
+  grid.innerHTML = '';
+  // Don't reset lucFocusedCol here — preserve across filter changes
+
+  lucClassOrder.forEach(cls => {
+    const group = data.filter(s => s._class === cls);
+    const cfg = colConfig[cls];
+
+    const col = document.createElement('div');
+    col.className = `luc-col luc-col-${cls}`;
+    col.dataset.cls = cls;
+
+    const hdr = document.createElement('div');
+    hdr.className = 'luc-col-hdr';
+    hdr.style.cursor = 'pointer';
+    hdr.title = 'Clique para expandir';
+    hdr.onclick = () => lucFocusedCol === cls ? closeLucFocus() : focusLucCol(cls);
+    hdr.innerHTML = `
+      <div>
+        <div class="luc-col-hdr-title">${cfg.title}</div>
+        <div class="luc-col-hdr-range">${cfg.range}</div>
+      </div>
+      <div class="luc-col-hdr-count">${group.length}</div>`;
+    col.appendChild(hdr);
+
+    const body = document.createElement('div');
+    body.className = 'luc-col-body';
+
+    if (!group.length) {
+      body.innerHTML = `<div class="luc-col-empty">Nenhum setor</div>`;
+    } else {
+      group.forEach(s => {
+        const lucPct = s._luc != null ? `<span class="luc-card-pct">${(s._luc*100).toFixed(2)}%</span>` : '';
+        const card = document.createElement('div');
+        card.className = 'luc-card';
+        card.dataset.lucro = s._lucro ?? '';
+        card.innerHTML = `
+          <div class="luc-card-nome" title="${s.nome}">${s.nome}</div>
+          <div class="luc-card-code">${s.code}${s.linha ? `<span class="linha-badge lb-${s.linha.toLowerCase()}">${s.linha}</span>` : ''}</div>
+          <div class="luc-card-val">${fBR(s._lucro)}${lucPct}</div>
+          <div class="luc-card-reg">${s.regional} ${(s.regional_nome||'').split(' ')[0]} · ${s.distrital} ${(s.distrital_nome||'').split(' ')[0]}</div>`;
+        body.appendChild(card);
+      });
+    }
+
+    col.appendChild(body);
+    grid.appendChild(col);
+  });
+
+  // Re-apply focus if one was active before re-render
+  if (lucFocusedCol) applyLucFocus();
 }
 
 // ── LEGEND MODAL ──────────────────────────────────────────────────────────────

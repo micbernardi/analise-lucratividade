@@ -355,3 +355,154 @@ thead tr:not(.thead-groups) th { border-top: none; }
 .linha-dd.open .linha-dd-menu{display:block}
 .linha-dd-opt{padding:6px 12px;cursor:pointer;font-size:11px;color:var(--text);display:flex;align-items:center}
 .linha-dd-opt:hover{background:var(--surface)}
+
+/* Export button */
+.btn-export{border-color:#1a6b3f !important;color:#1a6b3f !important}
+.btn-export:hover{background:var(--gs) !important;border-color:var(--green) !important}
+
+/* ── VIEW TABS ── */
+.view-tabs{display:flex;gap:4px;margin-left:16px}
+.view-tab{padding:4px 12px;border-radius:6px;border:1px solid var(--border2);background:#eef0f3;color:var(--muted2);font-size:11px;font-weight:700;cursor:pointer;font-family:var(--fb);transition:all .15s}
+.view-tab.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+.view-tab:hover:not(.active){color:var(--text)}
+
+/* ══════════════════════════════════════════════════════
+   LUC VIEW — Executive Design
+   ══════════════════════════════════════════════════════ */
+
+/* Legend bar */
+.luc-legend{display:flex;align-items:center;gap:12px;flex:1;flex-wrap:wrap}
+.luc-leg-item{display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;color:var(--muted2);letter-spacing:.03em}
+.luc-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.lc-critico{background:#be123c}
+.lc-alerta{background:#c2410c}
+.lc-atencao{background:#a16207}
+.lc-atencao-leve{background:#ca8a04}
+.lc-saudavel{background:#15803d}
+
+/* Summary strip */
+.luc-summary{display:flex;gap:0;margin-bottom:16px;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.08);border:1px solid rgba(0,0,0,.06)}
+.luc-scard{flex:1;padding:16px 20px;display:flex;flex-direction:column;gap:3px;border-right:1px solid rgba(0,0,0,.06);position:relative;overflow:hidden}
+.luc-scard:last-child{border-right:none}
+.luc-scard::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.luc-scard-n{font-family:var(--ff);font-weight:900;font-size:28px;line-height:1;letter-spacing:-1px}
+.luc-scard-l{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;margin-top:3px}
+.luc-scard-sub{font-size:9px;margin-top:2px;opacity:.6}
+.lsc-critico{background:#fff}
+.lsc-critico::before{background:#be123c}
+.lsc-critico .luc-scard-n{color:#be123c}
+.lsc-critico .luc-scard-l{color:#9f1239}
+.lsc-alerta{background:#fff}
+.lsc-alerta::before{background:#c2410c}
+.lsc-alerta .luc-scard-n{color:#c2410c}
+.lsc-alerta .luc-scard-l{color:#9a3412}
+.lsc-atencao{background:#fff}
+.lsc-atencao::before{background:#a16207}
+.lsc-atencao .luc-scard-n{color:#a16207}
+.lsc-atencao .luc-scard-l{color:#92400e}
+.lsc-atencao-leve{background:#fff}
+.lsc-atencao-leve::before{background:#ca8a04}
+.lsc-atencao-leve .luc-scard-n{color:#ca8a04}
+.lsc-atencao-leve .luc-scard-l{color:#a16207}
+.lsc-saudavel{background:#fff}
+.lsc-saudavel::before{background:#15803d}
+.lsc-saudavel .luc-scard-n{color:#15803d}
+.lsc-saudavel .luc-scard-l{color:#166534}
+
+/* ── Column layout ── */
+.luc-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;align-items:start}
+.luc-col{display:flex;flex-direction:column;gap:0;border-radius:14px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,.07)}
+.luc-col-hdr{padding:14px 18px;display:flex;align-items:center;justify-content:space-between}
+.luc-col-hdr-title{font-family:var(--ff);font-weight:900;font-size:13px;text-transform:uppercase;letter-spacing:.08em}
+.luc-col-hdr-range{font-size:10px;font-weight:600;opacity:.7}
+.luc-col-hdr-count{font-family:var(--ff);font-weight:900;font-size:22px;line-height:1}
+.luc-col-body{display:flex;flex-direction:column;gap:1px;background:rgba(0,0,0,.04)}
+
+/* Column themes */
+.luc-col-critico .luc-col-hdr{background:#be123c;color:#fff}
+.luc-col-critico .luc-col-body{background:#fef2f4}
+.luc-col-alerta .luc-col-hdr{background:#c2410c;color:#fff}
+.luc-col-alerta .luc-col-body{background:#fff7ed}
+.luc-col-atencao .luc-col-hdr{background:#a16207;color:#fff}
+.luc-col-atencao .luc-col-body{background:#fffbeb}
+.luc-col-atencao-leve .luc-col-hdr{background:#ca8a04;color:#fff}
+.luc-col-atencao-leve .luc-col-body{background:#fefce8}
+.luc-col-saudavel .luc-col-hdr{background:#15803d;color:#fff}
+.luc-col-saudavel .luc-col-body{background:#f0fdf4}
+
+/* Cards inside columns */
+.luc-card{padding:14px 16px;background:#fff;transition:background .12s;position:relative;border-left:3px solid transparent}
+.luc-card:hover{background:#f8fafc}
+.luc-col-critico .luc-card{border-left-color:#fca5a5}
+.luc-col-alerta .luc-card{border-left-color:#fdba74}
+.luc-col-atencao .luc-card{border-left-color:#fcd34d}
+.luc-col-atencao-leve .luc-card{border-left-color:#fef08a}
+.luc-col-saudavel .luc-card{border-left-color:#86efac}
+
+.luc-card-nome{font-family:var(--ff);font-weight:800;font-size:12px;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
+.luc-card-code{font-size:10px;font-weight:700;color:#64748b;margin-top:2px;display:flex;align-items:center;gap:5px}
+.luc-card-val{font-family:var(--ff);font-weight:900;font-size:18px;line-height:1;margin-top:10px;letter-spacing:-.5px}
+.luc-card-pct{font-size:11px;font-weight:700;margin-left:4px;opacity:.75}
+.luc-col-critico .luc-card-val{color:#be123c}
+.luc-col-alerta .luc-card-val{color:#c2410c}
+.luc-col-atencao .luc-card-val{color:#a16207}
+.luc-col-atencao-leve .luc-card-val{color:#ca8a04}
+.luc-col-saudavel .luc-card-val{color:#15803d}
+
+.luc-card-reg{font-size:10px;font-weight:800;color:#334155;margin-top:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.luc-card-bar{display:none}
+
+/* Empty column state */
+.luc-col-empty{padding:20px 16px;text-align:center;font-size:11px;color:rgba(255,255,255,.6);font-style:italic;background:rgba(0,0,0,.08)}
+
+/* ── LUC EXPANDED COLUMN ── */
+.luc-grid.has-focus .luc-col:not(.focused){
+  display:none;
+}
+.luc-grid.has-focus{
+  grid-template-columns:1fr;
+}
+.luc-col.focused .luc-col-hdr{
+  cursor:pointer;
+  padding:20px 28px;
+}
+.luc-col.focused .luc-col-hdr-title{
+  font-size:18px;
+}
+.luc-col.focused .luc-col-hdr-count{
+  font-size:36px;
+}
+.luc-col.focused .luc-col-body{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+  gap:1px;
+}
+.luc-col-sort{
+  display:flex;align-items:center;gap:6px;
+  padding:8px 28px;font-size:11px;font-weight:700;
+  color:#fff;background:rgba(0,0,0,.15);
+  border-bottom:1px solid rgba(255,255,255,.1);
+}
+.luc-sort-btn{
+  padding:3px 12px;border-radius:20px;border:1px solid rgba(255,255,255,.4);
+  background:transparent;color:#fff;font-size:10px;font-weight:800;
+  cursor:pointer;font-family:var(--ff);letter-spacing:.04em;transition:all .15s;
+}
+.luc-sort-btn.active{background:rgba(255,255,255,.25);border-color:#fff;}
+.luc-col-close{
+  margin-left:auto;padding:3px 10px;border-radius:20px;
+  border:1px solid rgba(255,255,255,.4);background:transparent;
+  color:#fff;font-size:10px;font-weight:700;cursor:pointer;
+  font-family:var(--ff);transition:all .15s;
+}
+.luc-col-close:hover{background:rgba(255,255,255,.2);}
+
+/* Subtle divider between cards */
+.luc-col-body .luc-card + .luc-card{
+  border-top:1px solid rgba(0,0,0,.06);
+}
+.luc-col-critico .luc-col-body .luc-card + .luc-card{border-top-color:rgba(190,18,60,.1)}
+.luc-col-alerta  .luc-col-body .luc-card + .luc-card{border-top-color:rgba(194,65,12,.1)}
+.luc-col-atencao .luc-col-body .luc-card + .luc-card{border-top-color:rgba(161,98,7,.1)}
+.luc-col-atencao-leve .luc-col-body .luc-card + .luc-card{border-top-color:rgba(202,138,4,.1)}
+.luc-col-saudavel .luc-col-body .luc-card + .luc-card{border-top-color:rgba(21,128,61,.1)}

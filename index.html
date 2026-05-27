@@ -21,6 +21,10 @@
       <h1>Dashboard Rentabilidade & Desempenho</h1>
       <p>JAN–ABR 2026</p>
     </div>
+    <div class="view-tabs">
+      <button class="view-tab active" id="vt-geral" onclick="switchView('geral')">📊 Geral</button>
+      <button class="view-tab" id="vt-luc" onclick="switchView('luc')">💰 Lucratividade</button>
+    </div>
   </div>
   <div class="hcounts">
     <div class="hc"><div class="hc-v" id="h-tot" style="color:var(--muted2)">—</div><div class="hc-l">Setores</div></div>
@@ -30,6 +34,10 @@
     <div class="hc"><div class="hc-v" style="color:var(--red)" id="h-c">—</div><div class="hc-l">Crítico</div></div>
     <span id="h-est" style="display:none"></span>
     <span id="h-rec" style="display:none"></span>
+    <button class="btn-upload btn-export" id="btn-export" onclick="exportExcel()" style="display:none">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3v7M5 7l3 3 3-3M3 12h10"/></svg>
+      Exportar
+    </button>
     <button class="btn-upload" onclick="openUpload()">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 10V3M5 6l3-3 3 3M3 12h10"/></svg>
       Planilhas
@@ -314,6 +322,66 @@
   </div>
 </div>
 
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- VIEW: LUCRATIVIDADE                                                    -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div id="view-luc" style="display:none">
+
+  <!-- FILTERS LUC -->
+  <div class="fbar">
+    <div class="fbar-row">
+      <div class="fg"><label>Regional</label>
+        <select id="lf-reg" onchange="onLucRegChange()"><option value="">Todas</option></select></div>
+      <div class="fg"><label>Distrital</label>
+        <select id="lf-dist" onchange="renderLuc()"><option value="">Todas</option></select></div>
+      <div class="fsep"></div>
+      <div class="fg"><label>Linha</label>
+        <div class="linha-dd" id="luc-linha-dd" onclick="toggleLucLinhaDd(event)">
+          <span id="luc-linha-dd-label">Todas</span>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 3.5l3 3 3-3"/></svg>
+          <div class="linha-dd-menu" id="luc-linha-dd-menu">
+            <div class="linha-dd-opt" onclick="setLucLinha(event,'')">Todas</div>
+            <div class="linha-dd-opt" onclick="setLucLinha(event,'PRIME')"><span class="linha-badge lb-prime">PRIME</span></div>
+            <div class="linha-dd-opt" onclick="setLucLinha(event,'INFINITY')"><span class="linha-badge lb-infinity">INFINITY</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="fsep"></div>
+      <div class="fg"><label>Buscar</label>
+        <input type="text" id="lf-search" placeholder="Nome ou código..." oninput="renderLuc()"></div>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+        <div class="msel">
+          <span>Mês:</span>
+        </div>
+        <div class="msel" id="luc-msel" style="margin-left:0"></div>
+      </div>
+    </div>
+    <div class="fbar-row">
+      <div class="luc-legend">
+        <span class="luc-leg-item"><span class="luc-dot lc-critico"></span>Crítico (negativo)</span>
+        <span class="luc-leg-item"><span class="luc-dot lc-alerta"></span>Alerta (R$0–9.999)</span>
+        <span class="luc-leg-item"><span class="luc-dot lc-atencao"></span>Atenção (R$10K–20K)</span>
+        <span class="luc-leg-item"><span class="luc-dot lc-atencao-leve"></span>Atenção Leve (R$20K–24.999)</span>
+        <span class="luc-leg-item"><span class="luc-dot lc-saudavel"></span>Saudável (≥ R$25K)</span>
+        <div class="ctabs" style="margin-left:auto">
+          <button class="ctab t-neg" id="lbtn-neg" onclick="toggleLucNeg()">📉 Negativos</button>
+          <button class="ctab t-virou" id="lbtn-virou" onclick="toggleLucVirou()">🔻 Virou Negativo</button>
+          <button class="ctab t-virou-pos" id="lbtn-virou-pos" onclick="toggleLucVirouPos()">🔺 Virou Positivo</button>
+        </div>
+        <span id="luc-count" style="font-size:10px;color:var(--muted);font-weight:700;white-space:nowrap"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SUMMARY CARDS -->
+  <div class="main" style="padding-top:6px">
+    <div class="luc-summary" id="luc-summary"></div>
+
+    <!-- GRID -->
+    <div class="luc-grid" id="luc-grid"></div>
+  </div>
+</div>
 
 <script src="script.js"></script>
 </body>
