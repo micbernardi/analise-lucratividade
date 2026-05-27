@@ -102,10 +102,10 @@ input[type=text]{width:150px}
 .thdr{padding:6px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
 .thdr h2{font-family:var(--ff);font-size:13px;font-weight:800}
 .tcnt{font-size:11px;color:var(--muted)}
-table{width:100%;border-collapse:collapse;table-layout:fixed}
+
 thead th{
-  padding:8px 8px;text-align:left;font-size:11px;text-transform:uppercase;
-  letter-spacing:.05em;color:rgba(255,255,255,.9);background:var(--navy);
+  padding:8px 4px;text-align:left;font-size:10px;text-transform:uppercase;
+  letter-spacing:.04em;color:rgba(255,255,255,.9);background:var(--navy);
   border-bottom:none;cursor:pointer;user-select:none;
   white-space:nowrap;font-family:var(--fb);font-weight:700;overflow:hidden;
   }
@@ -123,7 +123,7 @@ thead th.sorted .si{opacity:1;color:#93c5fd}
 /* group separators */
 thead th.gs{border-left:1px solid rgba(255,255,255,.15)}
 tbody td.gs{border-left:1px solid var(--border2)}
-tbody td{padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:middle;overflow:hidden;font-size:13px;text-align:left}
+tbody td{padding:7px 4px;border-bottom:1px solid var(--border);vertical-align:middle;overflow:hidden;font-size:13px;text-align:left}
 tbody td:last-child{overflow:clip;padding-right:14px}
 tbody tr:last-child td{border-bottom:none}
 tbody tr:hover td{background:#e8edf8}
@@ -295,20 +295,27 @@ tbody tr:hover td.sh-col{background:rgba(251,191,36,.4) !important}
 .brand-divider{width:1px;height:24px;background:var(--border);margin:0 10px;flex-shrink:0}
 
 /* Center data columns */
-tbody td.c-class,tbody td.c-luc,
+tbody td.c-class,tbody td.c-luc{text-align:center}
 tbody td.c-vm,
 tbody td.c-sytd,tbody td.c-mytd,tbody td.c-shytd,
-tbody td.c-sabr,tbody td.c-mabr,tbody td.c-shabr{text-align:center}
-thead th.c-class,
+tbody td.c-sabr,tbody td.c-mabr,tbody td.c-shabr{text-align:right;padding-left:2px;padding-right:6px}
+thead th.c-class{text-align:center}
 thead th.c-vm,
 thead th.c-sytd,thead th.c-mytd,thead th.c-shytd,
-thead th.c-sabr,thead th.c-mabr,thead th.c-shabr{text-align:center}
+thead th.c-sabr,thead th.c-mabr,thead th.c-shabr{text-align:right;padding-left:2px;padding-right:6px}
 .tg-vm,.tg-ytd,.tg-mes{text-align:center}
 
+table{width:100%;border-collapse:collapse;table-layout:auto}
+
 /* Better column widths — less dead space */
-.c-setor{width:20%}.c-hier{width:14%}.c-class{width:6%}.c-luc{width:10%}
-.c-vm{width:6%}.c-sytd{width:6%}.c-mytd{width:6%}.c-shytd{width:6%}
-.c-sabr{width:6%}.c-mabr{width:6%}.c-shabr{width:6%}
+.c-setor{min-width:160px}.c-hier{min-width:110px}.c-class{min-width:60px}.c-luc{min-width:140px}
+.c-vm{width:80px;max-width:80px}
+.c-sytd{width:68px;max-width:68px}.c-mytd{width:68px;max-width:68px}.c-shytd{width:76px;max-width:76px}
+.c-sabr{width:68px;max-width:68px}.c-mabr{width:68px;max-width:68px}.c-shabr{width:76px;max-width:76px}
+thead th.c-vm,thead th.c-sytd,thead th.c-mytd,thead th.c-shytd,
+thead th.c-sabr,thead th.c-mabr,thead th.c-shabr{white-space:nowrap;overflow:hidden}
+tbody td.c-vm,tbody td.c-sytd,tbody td.c-mytd,tbody td.c-shytd,
+tbody td.c-sabr,tbody td.c-mabr,tbody td.c-shabr{white-space:nowrap;overflow:hidden}
 
 /* Upload panel scrollable content */
 .upload-panel-body{flex:1;overflow-y:auto;overflow-x:hidden;padding-right:4px;margin-bottom:12px}
