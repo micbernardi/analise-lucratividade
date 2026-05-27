@@ -39,40 +39,43 @@
 
 <!-- FILTERS -->
 <div class="fbar">
-  <div class="fg"><label>Regional</label>
-    <select id="f-reg" onchange="onRegChange()"><option value="">Todas</option></select></div>
-  <div class="fg"><label>Distrital</label>
-    <select id="f-dist" onchange="applyFilters()"><option value="">Todas</option></select></div>
-  <div class="fsep"></div>
-  <div class="fg"><label>Meses neg.</label>
-    <select id="f-neg" onchange="applyFilters()">
-      <option value="">Todos</option><option value="1">≥ 1</option>
-      <option value="2">≥ 2</option><option value="3">≥ 3</option><option value="4">4 meses</option>
-    </select></div>
-  <div class="fg"><label>Share YTD</label>
-    <select id="f-share" onchange="applyFilters()">
-      <option value="">Todos</option>
-      <option value="beat">Ganhou share</option><option value="miss">Perdeu share</option>
-    </select></div>
-  <div class="fsep"></div>
-  <div class="fg"><label>Linha</label>
-    <select id="f-linha" onchange="applyFilters()">
-      <option value="">Todas</option>
-      <option value="PRIME">PRIME</option>
-      <option value="INFINITY">INFINITY</option>
-    </select>
+  <div class="fbar-row">
+    <div class="fg"><label>Regional</label>
+      <select id="f-reg" onchange="onRegChange()"><option value="">Todas</option></select></div>
+    <div class="fg"><label>Distrital</label>
+      <select id="f-dist" onchange="applyFilters()"><option value="">Todas</option></select></div>
+    <div class="fsep"></div>
+    <div class="fg"><label>Meses neg.</label>
+      <select id="f-neg" onchange="applyFilters()">
+        <option value="">Todos</option><option value="1">≥ 1</option>
+        <option value="2">≥ 2</option><option value="3">≥ 3</option><option value="4">4 meses</option>
+      </select></div>
+    <div class="fg"><label>Share YTD</label>
+      <select id="f-share" onchange="applyFilters()">
+        <option value="">Todos</option>
+        <option value="beat">Ganhou share</option><option value="miss">Perdeu share</option>
+      </select></div>
+    <div class="fsep"></div>
+    <div class="fg"><label>Linha</label>
+      <select id="f-linha" onchange="applyFilters()">
+        <option value="">Todas</option>
+        <option value="PRIME">PRIME</option>
+        <option value="INFINITY">INFINITY</option>
+      </select></div>
+    <div class="fsep"></div>
+    <div class="fg"><label>Buscar</label>
+      <input type="text" id="f-search" placeholder="Nome ou código..." oninput="applyFilters()"></div>
   </div>
-  <div class="fsep"></div>
-  <div class="fg"><label>Buscar</label>
-    <input type="text" id="f-search" placeholder="Nome ou código..." oninput="applyFilters()"></div>
-  <div class="ctabs">
-    <button class="ctab t-all" onclick="setTab('',this)">Todos</button>
-    <button class="ctab" onclick="setTab('Saudável',this)"><span class="d6 s"></span>Saudável</button>
-    <button class="ctab" onclick="setTab('Atenção',this)"><span class="d6 a"></span>Atenção</button>
-    <button class="ctab" onclick="setTab('Crítico',this)"><span class="d6 c"></span>Crítico</button>
-    <button class="ctab t-neg" id="btn-neg" onclick="toggleNegFilter(this)">📉 Negativos</button>
-    <button class="ctab t-virou" id="btn-virou" onclick="toggleVirouFilter(this)">🔻 Virou Negativo</button>
-    <button class="ctab t-virou-pos" id="btn-virou-pos" onclick="toggleVirouPosFilter(this)">🔺 Virou Positivo</button>
+  <div class="fbar-row">
+    <div class="ctabs">
+      <button class="ctab t-all" onclick="setTab('',this)">Todos</button>
+      <button class="ctab" onclick="setTab('Saudável',this)"><span class="d6 s"></span>Saudável</button>
+      <button class="ctab" onclick="setTab('Atenção',this)"><span class="d6 a"></span>Atenção</button>
+      <button class="ctab" onclick="setTab('Crítico',this)"><span class="d6 c"></span>Crítico</button>
+      <button class="ctab t-neg" id="btn-neg" onclick="toggleNegFilter(this)">📉 Negativos</button>
+      <button class="ctab t-virou" id="btn-virou" onclick="toggleVirouFilter(this)">🔻 Virou Negativo</button>
+      <button class="ctab t-virou-pos" id="btn-virou-pos" onclick="toggleVirouPosFilter(this)">🔺 Virou Positivo</button>
+    </div>
   </div>
 </div>
 
@@ -80,12 +83,6 @@
 
   <!-- KPI CARDS — sticky wrapper -->
   <div class="kpis-wrap">
-    <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:5px">
-      <button class="btn-legend" onclick="openLegend()">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="7"/><path d="M8 7v5M8 5v.5"/></svg>
-        O que significa cada card?
-      </button>
-    </div>
     <div class="kpis">
       <div class="kpi ks" id="ki-s" onclick="kpiClick('Saudável','ki-s')">
         <div class="kv" style="color:var(--green)" id="kv-s">—</div>
@@ -128,6 +125,10 @@
     <span class="li"><span class="d6 a"></span>Atenção</span>
     <span class="li"><span class="d6 alr"></span>ALERTA</span>
     <span class="li"><span class="d6 c"></span>Crítico</span>
+    <button class="btn-legend" onclick="openLegend()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="7"/><path d="M8 7v5M8 5v.5"/></svg>
+      O que significa cada card?
+    </button>
     <div style="display:flex;align-items:center;gap:6px;padding:3px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px">
       <span style="font-size:9px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em" id="lbl-consolidada">Luc. Brasil ABR</span>
       <span id="kv-med" style="font-family:var(--ff);font-weight:800;font-size:14px;color:var(--green)">—</span>
