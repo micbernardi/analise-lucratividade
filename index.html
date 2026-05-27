@@ -57,11 +57,15 @@
       </select></div>
     <div class="fsep"></div>
     <div class="fg"><label>Linha</label>
-      <select id="f-linha" onchange="applyFilters()">
-        <option value="">Todas</option>
-        <option value="PRIME">PRIME</option>
-        <option value="INFINITY">INFINITY</option>
-      </select></div>
+      <div class="linha-dd" id="linha-dd" onclick="toggleLinhaDd(event)">
+        <span id="linha-dd-label">Todas</span>
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 3.5l3 3 3-3"/></svg>
+        <div class="linha-dd-menu" id="linha-dd-menu">
+          <div class="linha-dd-opt" onclick="setLinha(event,'')">Todas</div>
+          <div class="linha-dd-opt" onclick="setLinha(event,'PRIME')"><span class="linha-badge lb-prime">PRIME</span></div>
+          <div class="linha-dd-opt" onclick="setLinha(event,'INFINITY')"><span class="linha-badge lb-infinity">INFINITY</span></div>
+        </div>
+      </div></div>
     <div class="fsep"></div>
     <div class="fg"><label>Buscar</label>
       <input type="text" id="f-search" placeholder="Nome ou código..." oninput="applyFilters()"></div>

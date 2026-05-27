@@ -21,6 +21,24 @@ let DESEMP_BY_MES = {}; // desempenho data keyed by month: { JAN: {code: {...}},
 let filtered = [], sortCol = 'classificacao', sortDir = 1, page = 0;
 const PS = 100;
 let activeTab = '', kpiF = '', viewM = 'ABR', negFilter = false, virouFilter = false, virouPosFilter = false;
+let linhaVal = '';
+
+function toggleLinhaDd(e) {
+  e.stopPropagation();
+  document.getElementById('linha-dd').classList.toggle('open');
+}
+function setLinha(e, val) {
+  e.stopPropagation();
+  linhaVal = val;
+  const label = document.getElementById('linha-dd-label');
+  if (val === 'PRIME') label.innerHTML = '<span class="linha-badge lb-prime">PRIME</span>';
+  else if (val === 'INFINITY') label.innerHTML = '<span class="linha-badge lb-infinity">INFINITY</span>';
+  else label.textContent = 'Todas';
+  document.getElementById('linha-dd').classList.remove('open');
+  applyFilters();
+}
+// Close dropdown when clicking outside
+document.addEventListener('click', () => document.getElementById('linha-dd')?.classList.remove('open'));
 
 // Upload state
 let pendingLuc = []; // File objects
@@ -239,7 +257,6 @@ function getBase() {
   return SETORES.filter(s => {
     if (activeTab && s.classificacao !== activeTab) return false;
     if (negFilter && (s['luc_' + viewM] == null || s['luc_' + viewM] >= 0)) return false;
-    const linhaVal = document.getElementById('f-linha')?.value || '';
     if (linhaVal && s.linha !== linhaVal) return false;
     if (virouFilter) {
       const cur = s['luc_' + viewM], prev = prevM ? s['luc_' + prevM] : null;
@@ -965,7 +982,8 @@ function clearAllData() {
   BRASIL_LUC = {}; GR_LUC = {}; GD_LUC = {};
   DESEMP_BY_MES = {}; activeMeses = []; filtered = [];
   pendingLuc = []; pendingDesemp = []; negFilter = false; virouFilter = false; virouPosFilter = false;
-  const fLinha = document.getElementById('f-linha'); if (fLinha) fLinha.value = '';
+  linhaVal = '';
+  const lbl = document.getElementById('linha-dd-label'); if (lbl) lbl.textContent = 'Todas';
   // Reset header counts
   ['h-tot','h-s','h-a','h-c'].forEach(id => document.getElementById(id).textContent = '—');
   ['kv-s','kv-a','kv-c','kv-ns'].forEach(id => { const el=document.getElementById(id); if(el) el.textContent='—'; });
