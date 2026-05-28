@@ -366,15 +366,15 @@
         <span class="luc-leg-item"><span class="luc-dot lc-atencao-leve"></span>Atenção Leve (R$20K–24.999)</span>
         <span class="luc-leg-item"><span class="luc-dot lc-saudavel"></span>Saudável (≥ R$25K)</span>
         <div class="ctabs" style="margin-left:auto">
+          <button class="btn-upload" onclick="openMedias()" style="margin-right:6px;background:var(--surface2);border-color:var(--border2);color:var(--fg)">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="12" height="2" rx="1"/><rect x="2" y="7" width="9" height="2" rx="1"/><rect x="2" y="11" width="11" height="2" rx="1"/></svg>
+            Médias
+          </button>
           <button class="ctab t-neg" id="lbtn-neg" onclick="toggleLucNeg()">📉 Negativos</button>
           <button class="ctab t-virou" id="lbtn-virou" onclick="toggleLucVirou()">🔻 Virou Negativo</button>
           <button class="ctab t-virou-pos" id="lbtn-virou-pos" onclick="toggleLucVirouPos()">🔺 Virou Positivo</button>
         </div>
         <span id="luc-count" style="font-size:10px;color:var(--muted);font-weight:700;white-space:nowrap"></span>
-        <button class="btn-upload" onclick="openMedias()" style="margin-left:8px;background:var(--surface2);border-color:var(--border2);color:var(--fg)">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="12" height="2" rx="1"/><rect x="2" y="7" width="9" height="2" rx="1"/><rect x="2" y="11" width="11" height="2" rx="1"/></svg>
-          Médias
-        </button>
         <button class="btn-upload btn-export" onclick="exportLucExcel()" style="margin-left:6px">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3v7M5 7l3 3 3-3M3 12h10"/></svg>
           Exportar Excel
