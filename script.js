@@ -93,6 +93,25 @@ function loadDataset(parsed) {
     s.regional_nome  = REGIONAIS[s.regional] || s.regional;
     const di = DISTRITAIS[s.distrital];
     s.distrital_nome = typeof di === 'string' ? di : (di?.name || s.distrital);
+
+    // Migração: garantir que venda_ytd_M e sup_ytd_M existam (dados antigos podem não ter).
+    // Fórmula oficial da planilha: LUCRATIVIDADE = LUCRO / VENDA LÍQUIDA
+    // Logo: venda_ytd = lucro / luc%
+    // sup_ytd (SUPERA R$ PL) é diferente — só pode ser preservado se já existir no save.
+    activeMeses.forEach(m => {
+      const lucro  = s['lucro_' + m];
+      const lucPct = s['luc_'   + m];
+
+      // Venda Líquida YTD (denominador oficial)
+      if (s['venda_ytd_' + m] == null && lucro != null && lucPct != null && lucPct !== 0) {
+        s['venda_ytd_' + m] = lucro / lucPct;
+      }
+      // SUPERA R$ PL YTD: apenas reconstrói se ausente — mesma fórmula (compat dados antigos
+      // que usavam esse campo como denominador). Se já existir, mantém.
+      if (s['sup_ytd_' + m] == null && lucro != null && lucPct != null && lucPct !== 0) {
+        s['sup_ytd_' + m] = lucro / lucPct;
+      }
+    });
   });
 
   // Show table, hide no-data
@@ -632,10 +651,11 @@ async function processFiles() {
               if (s['luc_' + m] != null || s['lucro_' + m] != null) {
                 lucData[m][s.code] = {
                   nome: s.nome, reg: s.regional, dist: s.distrital, linha: s.linha,
-                  luc:       s['luc_'   + m] ?? null,
-                  lucro:     s['lucro_' + m] ?? null,
-                  sup_ytd:   null, mkt_ytd: null,
-                  venda:     null, desp_fixa: null, desp_var: null,
+                  luc:       s['luc_'     + m] ?? null,
+                  lucro:     s['lucro_'   + m] ?? null,
+                  sup_ytd:   s['sup_ytd_' + m] ?? null,  // restored from saved setor
+                  mkt_ytd: null,
+                  venda:     s['venda_ytd_' + m] ?? null, desp_fixa: null, desp_var: null,
                 };
               }
             });
@@ -859,8 +879,10 @@ async function processFiles() {
       for (let i = 0; i < sortedMeses.length; i++) {
         const m   = sortedMeses[i];
         const d   = lucData[m][code];
-        s['luc_' + m]   = d?.luc   ?? null;
-        s['lucro_' + m] = d?.lucro ?? null;
+        s['luc_' + m]     = d?.luc     ?? null;
+        s['lucro_' + m]   = d?.lucro   ?? null;
+        s['sup_ytd_' + m] = d?.sup_ytd ?? null;  // YTD acumulado — base do luc%
+        s['venda_ytd_' + m] = d?.venda ?? null;  // Venda Líquida YTD — denominador oficial da Lucratividade
 
         // Venda mensal: JAN = ytd, resto = diferença
         const ytd = d?.sup_ytd ?? null;
@@ -984,7 +1006,7 @@ async function processFiles() {
       slim.setores = setores.map(s => {
         const r = {};
         for (const k of Object.keys(s)) {
-          if (!k.startsWith('venda_mes_')) r[k] = s[k];
+          if (!k.startsWith('venda_mes_')) r[k] = s[k]; // sup_ytd_ is kept
         }
         return r;
       });
@@ -1764,3 +1786,489 @@ function closeLegend() {
 function closeLegendIfBg(e) {
   if (e.target === document.getElementById('legend-overlay')) closeLegend();
 }
+
+// ── MÉDIAS MODAL ──────────────────────────────────────────────────────────────
+let mediasGrupo = 'linha';
+let mediasViewM = null;
+
+function openMedias() {
+  if (!SETORES.length) return;
+  mediasViewM = lucViewM;
+  // Build month buttons
+  const msel = document.getElementById('medias-msel');
+  msel.innerHTML = '<span style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em">Mês:</span>';
+  activeMeses.forEach(m => {
+    const b = document.createElement('button');
+    b.className = 'mb' + (m === mediasViewM ? ' ma' : '');
+    b.textContent = m;
+    b.onclick = () => {
+      mediasViewM = m;
+      renderMedias._sortCol = 'label'; renderMedias._sortDir = 1;
+      msel.querySelectorAll('.mb').forEach(x => x.classList.toggle('ma', x.textContent === m));
+      renderMedias();
+    };
+    msel.appendChild(b);
+  });
+  // Activate default group button
+  ['linha','regional','distrital','regional_linha'].forEach(g => {
+    const idMap = { linha: 'mg-linha', regional: 'mg-reg', distrital: 'mg-dist', regional_linha: 'mg-reg-linha' };
+    const btn = document.getElementById(idMap[g]);
+    if (btn) btn.classList.toggle('t-all', g === mediasGrupo);
+  });
+  document.getElementById('medias-overlay').classList.add('show');
+  renderMedias();
+}
+
+function closeMedias() {
+  document.getElementById('medias-overlay').classList.remove('show');
+}
+function closeMediasIfBg(e) {
+  if (e.target === document.getElementById('medias-overlay')) closeMedias();
+}
+
+function setMediasGrupo(g, btn) {
+  mediasGrupo = g;
+  renderMedias._sortCol = 'label'; renderMedias._sortDir = 1;
+  ['mg-linha','mg-reg','mg-dist','mg-reg-linha'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('t-all');
+  });
+  if (btn) btn.classList.add('t-all');
+  renderMedias();
+}
+
+function renderMedias() {
+  const m = mediasViewM || lucViewM;
+  const container = document.getElementById('medias-content');
+  if (!SETORES.length) { container.innerHTML = '<p style="color:var(--muted);text-align:center;padding:24px">Sem dados carregados.</p>'; return; }
+
+  const setores = SETORES.filter(s => s['luc_' + m] != null || s['lucro_' + m] != null);
+
+  const fPct = v => v == null ? '—' : (v >= 0 ? '+' : '') + (v * 100).toFixed(2) + '%';
+  const fBRL = v => v == null ? '—' : (v < 0 ? '−R$ ' : 'R$ ') + Math.abs(Math.round(v)).toLocaleString('pt-BR');
+  const cls  = v => v == null ? '' : (v >= 0 ? 'pos' : 'neg');
+
+  // Weighted average: Luc% = Σ Lucro YTD / Σ Venda Líquida YTD  (mesma fórmula da planilha oficial)
+  // Lucro R$ médio = Σ Lucro YTD / n setores (YTD, same field as luc%)
+  // Fallback: se venda_ytd não existir (dados antigos), usa sup_ytd ou reconstrói via lucro / luc%
+  function calcGroup(list) {
+    let sumLucro = 0, sumVenda = 0, nLucro = 0;
+    let sumLucroBRL = 0, nBRL = 0;
+    list.forEach(s => {
+      const lucro  = s['lucro_' + m];
+      // Denominador correto = Venda Líquida YTD.
+      // Fallbacks (compat dados antigos):
+      //   1) venda_ytd_M  (oficial)
+      //   2) lucro / luc%  → reconstrói a venda usada pelo % oficial
+      //   3) sup_ytd       (último recurso, gera % subestimado)
+      let venda = s['venda_ytd_' + m];
+      if (venda == null) {
+        const lucPct = s['luc_' + m];
+        if (lucro != null && lucPct != null && lucPct !== 0) {
+          venda = lucro / lucPct;
+        } else {
+          venda = s['sup_ytd_' + m] ?? s['venda_mes_' + m];
+        }
+      }
+      if (lucro != null && venda != null && venda > 0) {
+        sumLucro += lucro; sumVenda += venda; nLucro++;
+      }
+      if (lucro != null) { sumLucroBRL += lucro; nBRL++; }
+    });
+    return {
+      n:      list.length,
+      avgPct: sumVenda > 0 ? sumLucro / sumVenda : null,  // YTD weighted % (Lucro / Venda Líquida)
+      avgBRL: nBRL > 0 ? sumLucroBRL / nBRL : null,       // YTD avg R$ per setor
+      nPct: nLucro, nBRL,
+    };
+  }
+
+  // Sort state (persisted across re-renders via closure vars in openMedias scope)
+  if (!renderMedias._sortCol) { renderMedias._sortCol = 'label'; renderMedias._sortDir = 1; }
+
+  function buildRows(rawRows) {
+    const total = rawRows.find(r => r.isTotal);
+    let data = rawRows.filter(r => !r.isTotal);
+    const col = renderMedias._sortCol;
+    const dir = renderMedias._sortDir;
+    data.sort((a, b) => {
+      let va, vb;
+      if (col === 'label') {
+        va = a.labelSort || a.label; vb = b.labelSort || b.label;
+        return dir * va.localeCompare(vb);
+      }
+      if (col === 'n')      { va = a.stat.n;      vb = b.stat.n; }
+      if (col === 'pct')    { va = a.stat.avgPct ?? -Infinity; vb = b.stat.avgPct ?? -Infinity; }
+      if (col === 'brl')    { va = a.stat.avgBRL ?? -Infinity; vb = b.stat.avgBRL ?? -Infinity; }
+      return dir * (va - vb);
+    });
+    if (total) data.push(total);
+    return data;
+  }
+
+  function sortIcon(col) {
+    const active = renderMedias._sortCol === col;
+    const dir = renderMedias._sortDir;
+    if (!active) return '<span style="opacity:.3;font-size:10px;margin-left:3px">↕</span>';
+    return dir === 1
+      ? '<span style="font-size:10px;margin-left:3px;color:var(--accent)">↑</span>'
+      : '<span style="font-size:10px;margin-left:3px;color:var(--accent)">↓</span>';
+  }
+
+  function doSort(col) {
+    if (renderMedias._sortCol === col) renderMedias._sortDir *= -1;
+    else { renderMedias._sortCol = col; renderMedias._sortDir = col === 'label' ? 1 : -1; }
+    renderMedias._sortCol = col;
+    renderMedias();
+  }
+  window._mediasSort = doSort;
+
+  let rawRows = [];
+  let title = '';
+
+  if (mediasGrupo === 'linha') {
+    title = 'Média por Linha de Produto';
+    const grupos = {};
+    setores.forEach(s => {
+      const key = s.linha || '—';
+      if (!grupos[key]) grupos[key] = [];
+      grupos[key].push(s);
+    });
+    const order = ['PRIME','INFINITY'];
+    const keys = [...order.filter(k => grupos[k]), ...Object.keys(grupos).filter(k => !order.includes(k))];
+    keys.forEach(k => {
+      const badge = k === 'PRIME' ? `<span class="linha-badge lb-prime">PRIME</span>`
+                  : k === 'INFINITY' ? `<span class="linha-badge lb-infinity">INFINITY</span>`
+                  : `<span>${k}</span>`;
+      rawRows.push({ label: badge, labelSort: k, stat: calcGroup(grupos[k]) });
+    });
+    rawRows.push({ label: '<strong>Geral (todas as linhas)</strong>', labelSort: 'ZZZZZ', stat: calcGroup(setores), isTotal: true });
+
+  } else if (mediasGrupo === 'regional') {
+    title = 'Média por Regional';
+    const grupos = {};
+    setores.forEach(s => {
+      const key = s.regional;
+      if (!grupos[key]) grupos[key] = { nome: s.regional_nome || s.regional, list: [] };
+      grupos[key].list.push(s);
+    });
+    Object.values(grupos).forEach(g => {
+      rawRows.push({ label: g.nome, labelSort: g.nome, stat: calcGroup(g.list) });
+    });
+    rawRows.push({ label: '<strong>Geral (Brasil)</strong>', labelSort: 'ZZZZZ', stat: calcGroup(setores), isTotal: true });
+
+  } else if (mediasGrupo === 'distrital') {
+    title = 'Média por Distrital';
+    const grupos = {};
+    setores.forEach(s => {
+      const key = s.distrital;
+      if (!grupos[key]) grupos[key] = { nome: s.distrital_nome || s.distrital, reg: s.regional_nome || s.regional, list: [] };
+      grupos[key].list.push(s);
+    });
+    Object.values(grupos).forEach(g => {
+      rawRows.push({
+        label: `<span style="font-size:10px;color:var(--muted);margin-right:4px">${g.reg.split(' ')[0]}</span>${g.nome}`,
+        labelSort: g.reg + '|' + g.nome,
+        stat: calcGroup(g.list)
+      });
+    });
+    rawRows.push({ label: '<strong>Geral (Brasil)</strong>', labelSort: 'ZZZZZ', stat: calcGroup(setores), isTotal: true });
+
+  } else if (mediasGrupo === 'regional_linha') {
+    title = 'Rentabilidade Regional por Linha';
+    // Collect all unique lines (in preferred order)
+    const linhaOrder = ['PRIME', 'INFINITY'];
+    const linhasPresentes = [...new Set(setores.map(s => s.linha || '—'))];
+    const linhas = [...linhaOrder.filter(l => linhasPresentes.includes(l)), ...linhasPresentes.filter(l => !linhaOrder.includes(l))];
+
+    // Collect all unique regionals (sorted by name)
+    const regMap = {};
+    setores.forEach(s => {
+      if (!regMap[s.regional]) regMap[s.regional] = s.regional_nome || s.regional;
+    });
+    const regs = Object.entries(regMap).sort((a, b) => a[1].localeCompare(b[1]));
+
+    // Group: key = regional|linha
+    const grupos = {};
+    setores.forEach(s => {
+      const linha = s.linha || '—';
+      const key = s.regional + '|' + linha;
+      if (!grupos[key]) grupos[key] = { reg: s.regional, regNome: s.regional_nome || s.regional, linha, list: [] };
+      grupos[key].list.push(s);
+    });
+
+    const linhaBadge = l =>
+      l === 'PRIME'    ? `<span class="linha-badge lb-prime">PRIME</span>`
+      : l === 'INFINITY' ? `<span class="linha-badge lb-infinity">INFINITY</span>`
+      : `<span>${l}</span>`;
+
+    const linhaClass = l =>
+      l === 'PRIME'    ? 'blk-prime'
+      : l === 'INFINITY' ? 'blk-infinity'
+      : 'blk-other';
+
+    const fPct2 = v => v == null ? '<span class="muted-dash">—</span>' : `<span class="${v >= 0 ? 'pos' : 'neg'}">${(v >= 0 ? '+' : '') + (v * 100).toFixed(2) + '%'}</span>`;
+    const fBRL2 = v => v == null ? '<span class="muted-dash">—</span>' : `<span class="${v >= 0 ? 'pos' : 'neg'}">${v < 0 ? '−R$\u00A0' : 'R$\u00A0'}${Math.abs(Math.round(v)).toLocaleString('pt-BR')}</span>`;
+
+    // Build HTML table directly (not using generic buildRows)
+    let thtml = `
+      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:8px">${title} — YTD ${m}</div>
+      <div style="overflow-x:auto">
+      <table class="medias-table medias-reg-linha">
+        <thead>
+          <tr class="hdr-group">
+            <th class="col-reg" rowspan="2">Regional</th>`;
+
+    linhas.forEach(l => {
+      thtml += `<th class="grp-hdr ${linhaClass(l)}" colspan="2">${linhaBadge(l)}</th>`;
+    });
+    thtml += `<th class="grp-hdr blk-total" colspan="2">Total Regional</th>`;
+    thtml += `</tr><tr class="hdr-sub">`;
+    linhas.forEach(l => {
+      thtml += `<th class="num sub-pct ${linhaClass(l)}">Luc%</th><th class="num sub-brl ${linhaClass(l)}">R$ Médio</th>`;
+    });
+    thtml += `<th class="num sub-pct blk-total">Luc%</th><th class="num sub-brl blk-total">R$ Médio</th>`;
+    thtml += `</tr></thead><tbody>`;
+
+    regs.forEach(([regCode, regNome], idx) => {
+      const zebra = idx % 2 === 1 ? ' zebra' : '';
+      thtml += `<tr class="data-row${zebra}"><td class="col-reg"><strong>${regNome}</strong></td>`;
+      linhas.forEach(l => {
+        const key = regCode + '|' + l;
+        const g = grupos[key];
+        const s = g ? calcGroup(g.list) : null;
+        thtml += `<td class="num sub-pct ${linhaClass(l)}">${s ? fPct2(s.avgPct) : '<span class="muted-dash">—</span>'}</td>`;
+        thtml += `<td class="num sub-brl ${linhaClass(l)}">${s ? fBRL2(s.avgBRL) : '<span class="muted-dash">—</span>'}</td>`;
+      });
+      // Total for this regional across all linhas
+      const regAll = setores.filter(s => s.regional === regCode);
+      const regStat = calcGroup(regAll);
+      thtml += `<td class="num sub-pct blk-total"><strong>${fPct2(regStat.avgPct)}</strong></td>`;
+      thtml += `<td class="num sub-brl blk-total"><strong>${fBRL2(regStat.avgBRL)}</strong></td>`;
+      thtml += `</tr>`;
+    });
+
+    // Footer totals row (all regionals per linha)
+    thtml += `<tr class="row-total footer-row"><td class="col-reg"><strong>Geral (Brasil)</strong></td>`;
+    linhas.forEach(l => {
+      const linhaAll = setores.filter(s => (s.linha || '—') === l);
+      const stat = calcGroup(linhaAll);
+      thtml += `<td class="num sub-pct ${linhaClass(l)}"><strong>${fPct2(stat.avgPct)}</strong></td>`;
+      thtml += `<td class="num sub-brl ${linhaClass(l)}"><strong>${fBRL2(stat.avgBRL)}</strong></td>`;
+    });
+    const totalStat = calcGroup(setores);
+    thtml += `<td class="num sub-pct blk-total"><strong>${fPct2(totalStat.avgPct)}</strong></td>`;
+    thtml += `<td class="num sub-brl blk-total"><strong>${fBRL2(totalStat.avgBRL)}</strong></td>`;
+    thtml += `</tr></tbody></table></div>`;
+
+    const semBRL = setores.filter(s => s['lucro_' + m] == null).length;
+    const semPct = setores.filter(s => s['luc_' + m] == null).length;
+    if (semBRL > 0 || semPct > 0) {
+      thtml += `<div style="margin-top:8px;font-size:10px;color:var(--muted)">
+        ℹ️ ${semPct > 0 ? semPct + ' setor(es) sem dado de % | ' : ''}${semBRL > 0 ? semBRL + ' setor(es) sem dado de R$' : ''}
+      </div>`;
+    }
+    container.innerHTML = thtml;
+    return; // early return — we rendered directly, skip generic table below
+
+  } else {
+    // fallback (should not reach)
+    container.innerHTML = '';
+    return;
+  }
+
+  const rows = buildRows(rawRows);
+
+  const thStyle = 'cursor:pointer;user-select:none;white-space:nowrap';
+  let html = `
+    <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:8px">${title} — YTD ${m}</div>
+    <table class="medias-table">
+      <thead>
+        <tr>
+          <th style="min-width:160px;${thStyle}" onclick="_mediasSort('label')">Grupo ${sortIcon('label')}</th>
+          <th class="num" style="${thStyle}" onclick="_mediasSort('n')">Setores ${sortIcon('n')}</th>
+          <th class="num" style="${thStyle}" onclick="_mediasSort('pct')">
+            Luc% Ponderado
+            <span style="font-weight:400;text-transform:none;font-size:9px" title="Σ Lucro YTD / Σ Venda Líquida YTD — mesma fórmula da planilha oficial (LUCRATIVIDADE = LUCRO / VENDA LÍQUIDA)"> YTD ${m} ⓘ</span>
+            ${sortIcon('pct')}
+          </th>
+          <th class="num" style="${thStyle}" onclick="_mediasSort('brl')">
+            Lucro R$ Médio/Setor
+            <span style="font-weight:400;text-transform:none;font-size:9px"> YTD ${m}</span>
+            ${sortIcon('brl')}
+          </th>
+        </tr>
+      </thead>
+      <tbody>`;
+
+  rows.forEach(r => {
+    const s = r.stat;
+    html += `<tr class="${r.isTotal ? 'row-total' : ''}">
+      <td>${r.label}</td>
+      <td class="num">${s.n}</td>
+      <td class="num ${cls(s.avgPct)}">${fPct(s.avgPct)}</td>
+      <td class="num ${cls(s.avgBRL)}">${fBRL(s.avgBRL)}</td>
+    </tr>`;
+  });
+
+  html += '</tbody></table>';
+
+  const semBRL = setores.filter(s => s['lucro_' + m] == null).length;
+  const semPct = setores.filter(s => s['luc_' + m] == null).length;
+  if (semBRL > 0 || semPct > 0) {
+    html += `<div style="margin-top:8px;font-size:10px;color:var(--muted)">
+      ℹ️ ${semPct > 0 ? semPct + ' setor(es) sem dado de % | ' : ''}${semBRL > 0 ? semBRL + ' setor(es) sem dado de R$' : ''}
+    </div>`;
+  }
+
+  container.innerHTML = html;
+}
+
+// ── EXPORT LUC EXCEL ─────────────────────────────────────────────────────────
+async function exportLucExcel() {
+  if (!window.ExcelJS) { alert('Aguarde o carregamento da biblioteca ExcelJS...'); return; }
+
+  const reg  = document.getElementById('lf-reg').value;
+  const dist = document.getElementById('lf-dist').value;
+  const srch = (document.getElementById('lf-search').value||'').toLowerCase().trim();
+  const prevML = (() => { const i = activeMeses.indexOf(lucViewM); return i > 0 ? activeMeses[i-1] : null; })();
+
+  let data = SETORES.filter(s => {
+    if (reg  && s.regional  !== reg)  return false;
+    if (dist && s.distrital !== dist) return false;
+    if (lucLinhaVal && s.linha !== lucLinhaVal) return false;
+    if (srch && !s.nome.toLowerCase().includes(srch) && !s.code.includes(srch)) return false;
+    const cur   = s['lucro_' + lucViewM] ?? null;
+    const curL  = s['luc_'   + lucViewM] ?? null;
+    const curSign  = cur  != null ? cur  : (curL  != null ? (curL  >= 0 ? 1 : -1) : null);
+    const prev  = prevML ? (s['lucro_' + prevML] ?? null) : null;
+    const prevL = prevML ? (s['luc_'   + prevML] ?? null) : null;
+    const prevSign = prev != null ? prev : (prevL != null ? (prevL >= 0 ? 1 : -1) : null);
+    if (lucNegFilter      && (curSign == null || curSign >= 0)) return false;
+    if (lucVirouFilter    && (curSign == null || prevSign == null || !(prevSign >= 0 && curSign < 0))) return false;
+    if (lucVirouPosFilter && (curSign == null || prevSign == null || !(prevSign < 0 && curSign >= 0))) return false;
+    return true;
+  }).map(s => ({
+    ...s,
+    _lucro: s['lucro_' + lucViewM] ?? null,
+    _luc:   s['luc_'   + lucViewM] ?? null,
+    _class: lucClassify(s['lucro_' + lucViewM] ?? null),
+  })).filter(s => s._class !== null)
+    .sort((a,b) => {
+      const oi = lucClassOrder.indexOf(a._class) - lucClassOrder.indexOf(b._class);
+      return oi !== 0 ? oi : (a._lucro??0) - (b._lucro??0);
+    });
+
+  if (!data.length) { alert('Nenhum setor para exportar.'); return; }
+
+  const classLabel = {
+    'critico':'Crítico','alerta':'Alerta',
+    'atencao':'Atenção','atencao-leve':'Atenção Leve','saudavel':'Saudável'
+  };
+  const themeColor = {
+    'critico':'BE123C','alerta':'C2410C','atencao':'A16207',
+    'atencao-leve':'CA8A04','saudavel':'15803D'
+  };
+  const themeBg = {
+    'critico':'FFF1F2','alerta':'FFF7ED','atencao':'FFFBEB',
+    'atencao-leve':'FEFCE8','saudavel':'F0FDF4'
+  };
+
+  const wb = new ExcelJS.Workbook();
+  const sheetName = `Luc_${lucViewM}`.substring(0,31);
+  const ws = wb.addWorksheet(sheetName);
+
+  // Column definitions
+  ws.columns = [
+    { key:'cls',    width: 14 },
+    { key:'setor',  width: 56 },
+    { key:'linha',  width:  9 },
+    { key:'reg',    width: 28 },
+    { key:'dist',   width: 40 },
+    { key:'lucro',  width: 14 },
+    { key:'pct',    width: 11 },
+  ];
+
+  // Header row
+  const hdrRow = ws.addRow([
+    'Classificação','Setor','Linha','Regional','Distrital',
+    `Lucro R$ ${lucViewM}`, `Luc% ${lucViewM}`
+  ]);
+  hdrRow.height = 18;
+  hdrRow.eachCell(cell => {
+    cell.font      = { bold: true, color: { argb: 'FFFFFFFF' }, size: 12, name: 'Calibri' };
+    cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF002060' } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    cell.border    = { bottom: { style: 'thin', color: { argb: 'FFFFFFFF' } } };
+  });
+
+  // Freeze header
+  ws.views = [{ state: 'frozen', xSplit: 0, ySplit: 1, topLeftCell: 'A2', activeCell: 'A2' }];
+
+  // Data rows
+  data.forEach(s => {
+    const bg   = 'FF' + (themeBg[s._class]   || 'FFFFFF');
+    const fg   = 'FF' + (themeColor[s._class] || '000000');
+    const row  = ws.addRow([
+      classLabel[s._class] || '',
+      s.code + ' - ' + s.nome,
+      s.linha || '',
+      s.regional_nome || '',
+      s.distrital_nome || '',
+      s._lucro ?? null,
+      s._luc   ?? null,
+    ]);
+    row.height = 16;
+
+    row.eachCell({ includeEmpty: true }, (cell, colNum) => {
+      cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+      cell.border = { bottom: { style: 'thin', color: { argb: 'FFD9D9D9' } } };
+
+      const isLucro = colNum === 6;
+      const isPct   = colNum === 7;
+      const val     = cell.value;
+      const isNeg   = typeof val === 'number' && val < 0;
+      const numArgb = 'FF' + (isNeg ? 'B91C1C' : '15803D');
+
+      if (isLucro) {
+        cell.numFmt    = '\R\$\ #,##0;\-\R\$\ #,##0';
+        cell.font      = { bold: true, size: 12, name: 'Calibri', color: { argb: numArgb } };
+        cell.alignment = { horizontal: 'right', vertical: 'middle' };
+      } else if (isPct) {
+        cell.numFmt    = '0.00%';
+        cell.font      = { bold: true, size: 12, name: 'Calibri', color: { argb: numArgb } };
+        cell.alignment = { horizontal: 'right', vertical: 'middle' };
+      } else if (colNum === 1) {
+        cell.font      = { bold: true, size: 12, name: 'Calibri', color: { argb: fg } };
+        cell.alignment = { horizontal: 'left', vertical: 'middle' };
+      } else {
+        cell.font      = { size: 12, name: 'Calibri', color: { argb: 'FF000000' } };
+        cell.alignment = { horizontal: 'left', vertical: 'middle' };
+      }
+    });
+  });
+
+  // Download
+  const buf  = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  const date = new Date().toLocaleDateString('pt-BR').replace(/\//g,'-');
+  a.href     = url;
+  a.download = `SUPERA_Lucratividade_${lucViewM}_${date}.xlsx`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── LEGEND MODAL ──────────────────────────────────────────────────────────────
+function openLegend() {
+  document.getElementById('legend-overlay').classList.add('show');
+}
+function closeLegend() {
+  document.getElementById('legend-overlay').classList.remove('show');
+}
+function closeLegendIfBg(e) {
+  if (e.target === document.getElementById('legend-overlay')) closeLegend();
+}
+
+// ── MÉDIAS MODAL ──────────────────────────────────────────────────────────────

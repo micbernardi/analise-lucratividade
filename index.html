@@ -371,7 +371,11 @@
           <button class="ctab t-virou-pos" id="lbtn-virou-pos" onclick="toggleLucVirouPos()">🔺 Virou Positivo</button>
         </div>
         <span id="luc-count" style="font-size:10px;color:var(--muted);font-weight:700;white-space:nowrap"></span>
-        <button class="btn-upload btn-export" onclick="exportLucExcel()" style="margin-left:8px">
+        <button class="btn-upload" onclick="openMedias()" style="margin-left:8px;background:var(--surface2);border-color:var(--border2);color:var(--fg)">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="12" height="2" rx="1"/><rect x="2" y="7" width="9" height="2" rx="1"/><rect x="2" y="11" width="11" height="2" rx="1"/></svg>
+          Médias
+        </button>
+        <button class="btn-upload btn-export" onclick="exportLucExcel()" style="margin-left:6px">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3v7M5 7l3 3 3-3M3 12h10"/></svg>
           Exportar Excel
         </button>
@@ -385,6 +389,30 @@
 
     <!-- GRID -->
     <div class="luc-grid" id="luc-grid"></div>
+  </div>
+</div>
+
+<!-- MÉDIAS MODAL -->
+<div class="legend-modal-overlay" id="medias-overlay" onclick="closeMediasIfBg(event)">
+  <div class="legend-modal" style="max-width:1100px;width:96%">
+    <h2>
+      📊 Médias de Rentabilidade
+      <button class="legend-modal-close" onclick="closeMedias()">×</button>
+    </h2>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+      <div class="msel" id="medias-msel" style="margin-left:0"></div>
+      <label style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em">Agrupamento:</label>
+      <div style="display:flex;gap:6px">
+        <button class="ctab" id="mg-linha" onclick="setMediasGrupo('linha',this)" style="font-size:11px;padding:4px 10px">Por Linha</button>
+        <button class="ctab" id="mg-reg" onclick="setMediasGrupo('regional',this)" style="font-size:11px;padding:4px 10px">Por Regional</button>
+        <button class="ctab" id="mg-dist" onclick="setMediasGrupo('distrital',this)" style="font-size:11px;padding:4px 10px">Por Distrital</button>
+        <button class="ctab" id="mg-reg-linha" onclick="setMediasGrupo('regional_linha',this)" style="font-size:11px;padding:4px 10px">Regional × Linha</button>
+      </div>
+    </div>
+    <div id="medias-content" style="max-height:60vh;overflow-y:auto"></div>
+    <div style="padding:8px 12px;background:var(--surface2);border-radius:8px;font-size:11px;color:var(--muted2);margin-top:12px">
+      💡 <strong>Luc% ponderado</strong> = Σ Lucro R$ ÷ Σ Venda Líquida R$ do grupo (mesma fórmula da planilha oficial: LUCRATIVIDADE = LUCRO ÷ VENDA LÍQUIDA). <strong>Lucro R$ médio</strong> = média simples por setor.
+    </div>
   </div>
 </div>
 
