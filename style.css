@@ -2392,29 +2392,40 @@ thead tr:not(.thead-groups) th {
   font-size: 12px;
 }
 .medias-table thead tr {
-  background: var(--surface2);
+  background: var(--navy);
 }
-.medias-table th {
-  padding: 8px 12px;
-  text-align: left;
+.medias-table.medias-reg-linha thead tr { background: transparent; }
+.medias-table thead th {
+  padding: 11px 16px;
+  text-align: center;
   font-size: 10px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: .06em;
-  color: var(--muted);
-  border-bottom: 2px solid var(--border2);
+  color: #ffffff;
+  border-bottom: 2px solid var(--navy-light);
   white-space: nowrap;
 }
-.medias-table th.num { text-align: right; }
+/* Cross table preserves its own colored headers — undo color/border from generic rule */
+.medias-table.medias-reg-linha thead th {
+  color: inherit;
+  border-bottom: 1px solid var(--border);
+}
+.medias-table thead th:first-child { text-align: left; }
+.medias-table thead th > span { color: rgba(255,255,255,.7); }
+.medias-table.medias-reg-linha thead th > span { color: inherit; }
+.medias-table thead th.num { text-align: center; }
 .medias-table td {
-  padding: 8px 12px;
+  padding: 10px 16px;
   border-bottom: 1px solid var(--border);
   color: var(--fg);
   font-size: 12px;
   vertical-align: middle;
+  text-align: center;
 }
+.medias-table td:first-child { text-align: left; }
 .medias-table td.num {
-  text-align: right;
+  text-align: center;
   font-weight: 700;
   font-family: var(--ff);
 }
@@ -2502,6 +2513,7 @@ thead tr:not(.thead-groups) th {
 .medias-reg-linha tr.hdr-group th.grp-hdr.blk-total {
   background: linear-gradient(180deg, var(--navy), var(--navy-light));
   color: #ffffff;
+  font-weight: 800;
   border-left: 3px solid var(--navy);
   border-right: 3px solid var(--navy);
 }
@@ -2526,6 +2538,7 @@ thead tr:not(.thead-groups) th {
 .medias-reg-linha tr.hdr-sub th.sub-brl.blk-total {
   background: color-mix(in srgb, var(--navy) 10%, var(--surface));
   color: var(--navy);
+  font-weight: 800;
 }
 
 /* Vertical block separators on body cells */
