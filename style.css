@@ -1805,6 +1805,12 @@ thead tr:not(.thead-groups) th {
   border: 1px solid #fde68a
 }
 
+.lb-misto {
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #bbf7d0
+}
+
 /* Custom Linha dropdown */
 .linha-dd {
   position: relative;

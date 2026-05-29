@@ -1897,6 +1897,10 @@ function renderMedias() {
         va = a.labelSort || a.label; vb = b.labelSort || b.label;
         return dir * va.localeCompare(vb);
       }
+      if (col === 'tipo') {
+        va = a.tipoSort || 'ZZZ'; vb = b.tipoSort || 'ZZZ';
+        return dir * va.localeCompare(vb);
+      }
       if (col === 'n')      { va = a.stat.n;      vb = b.stat.n; }
       if (col === 'pct')    { va = a.stat.avgPct ?? -Infinity; vb = b.stat.avgPct ?? -Infinity; }
       if (col === 'brl')    { va = a.stat.avgBRL ?? -Infinity; vb = b.stat.avgBRL ?? -Infinity; }
@@ -1965,14 +1969,33 @@ function renderMedias() {
       if (!grupos[key]) grupos[key] = { nome: s.distrital_nome || s.distrital, reg: s.regional_nome || s.regional, list: [] };
       grupos[key].list.push(s);
     });
+
+    // Detecta tipo da distrital baseado nas linhas dos setores
+    function getDistTipo(list) {
+      const linhas = new Set(list.map(s => (s.linha || '').toUpperCase()).filter(l => l === 'PRIME' || l === 'INFINITY'));
+      if (linhas.has('PRIME') && linhas.has('INFINITY')) return 'MISTO';
+      if (linhas.has('INFINITY')) return 'INFINITY';
+      if (linhas.has('PRIME')) return 'PRIME';
+      return null;
+    }
+    function tipoBadge(tipo) {
+      if (tipo === 'INFINITY') return `<span class="linha-badge lb-infinity">INFINITY</span>`;
+      if (tipo === 'PRIME')    return `<span class="linha-badge lb-prime">PRIME</span>`;
+      if (tipo === 'MISTO')    return `<span class="linha-badge lb-misto">MISTO</span>`;
+      return '<span style="color:var(--muted);font-size:10px">—</span>';
+    }
+
     Object.values(grupos).forEach(g => {
+      const tipo = getDistTipo(g.list);
       rawRows.push({
         label: `<span style="font-size:10px;color:var(--muted);margin-right:4px">${g.reg.split(' ')[0]}</span>${g.nome}`,
         labelSort: g.reg + '|' + g.nome,
-        stat: calcGroup(g.list)
+        stat: calcGroup(g.list),
+        tipoBadge: tipoBadge(tipo),
+        tipoSort: tipo || 'ZZZ',
       });
     });
-    rawRows.push({ label: '<strong>Geral (Brasil)</strong>', labelSort: 'ZZZZZ', stat: calcGroup(setores), isTotal: true });
+    rawRows.push({ label: '<strong>Geral (Brasil)</strong>', labelSort: 'ZZZZZ', stat: calcGroup(setores), isTotal: true, tipoBadge: '', tipoSort: 'ZZZZZ' });
 
   } else if (mediasGrupo === 'regional_linha') {
     title = 'Rentabilidade Regional por Linha';
@@ -2080,12 +2103,14 @@ function renderMedias() {
   const rows = buildRows(rawRows);
 
   const thStyle = 'cursor:pointer;user-select:none;white-space:nowrap';
+  const isDistView = mediasGrupo === 'distrital';
   let html = `
     <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:8px">${title} — YTD ${m}</div>
     <table class="medias-table">
       <thead>
         <tr>
           <th style="min-width:160px;${thStyle}" onclick="_mediasSort('label')">Grupo ${sortIcon('label')}</th>
+          ${isDistView ? `<th style="${thStyle}" onclick="_mediasSort('tipo')">Tipo ${sortIcon('tipo')}</th>` : ''}
           <th class="num" style="${thStyle}" onclick="_mediasSort('n')">Setores ${sortIcon('n')}</th>
           <th class="num" style="${thStyle}" onclick="_mediasSort('pct')">
             Luc% Ponderado
@@ -2105,6 +2130,7 @@ function renderMedias() {
     const s = r.stat;
     html += `<tr class="${r.isTotal ? 'row-total' : ''}">
       <td>${r.label}</td>
+      ${isDistView ? `<td style="white-space:nowrap">${r.tipoBadge || ''}</td>` : ''}
       <td class="num">${s.n}</td>
       <td class="num ${cls(s.avgPct)}">${fPct(s.avgPct)}</td>
       <td class="num ${cls(s.avgBRL)}">${fBRL(s.avgBRL)}</td>
