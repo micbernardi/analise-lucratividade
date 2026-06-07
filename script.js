@@ -2544,7 +2544,7 @@ function renderTend(){
   const totalFilt=Object.values(counts).reduce((a,b)=>a+b,0);
   let warn='';
   if (counts.insuf>0 && counts.insuf >= totalFilt*0.5){
-    warn=`<div class="tend-warn">⚠ <b>Tendência indisponível</b> para a maioria dos setores. As planilhas foram processadas por uma versão anterior, sem as abas <b>MAT</b> e <b>TRM</b>. Vá em <b>Planilhas → Limpar dados salvos</b> e suba novamente a lucratividade + o desempenho para habilitar a análise de tendência. O equilíbrio mensal já funciona.</div>`;
+    warn=`<div class="tend-warn">⚠ <b>Tendência indisponível</b> para a maioria dos setores. Os <b>dados salvos no navegador</b> foram gravados por uma versão anterior do app (antes da tendência usar MAT/TRM) — <b>não é problema das planilhas</b>. Vá em <b>Planilhas → Limpar dados salvos</b> e suba a lucratividade + o desempenho de novo (uma vez) para reativar. O equilíbrio mensal já funciona.</div>`;
   }
   sum.innerHTML = warn + sum.innerHTML;
 
