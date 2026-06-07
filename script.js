@@ -2533,7 +2533,10 @@ function renderTend(){
   SETORES.forEach(s=>{ if(!tendPass(s))return; counts[tendMom(s).cat]++; });
   const order=['acelera','recupera','estavel','perde','queda','critico'];
   if (counts.insuf>0) order.push('insuf');
-  sum.innerHTML = order.map(k=>{ const m=MOM[k]; const act=tendBucket===k?' active':'';
+  const totalTodos = Object.values(counts).reduce((a,b)=>a+b,0);
+  const todosChip = `<div class="tend-sum${tendBucket===''?' active':''}" onclick="tendSetBucket('')">
+      <div class="ts-v" style="color:var(--navy)">${totalTodos}</div><div class="ts-l">Todos</div></div>`;
+  sum.innerHTML = todosChip + order.map(k=>{ const m=MOM[k]; const act=tendBucket===k?' active':'';
     return `<div class="tend-sum ${m.cls}${act}" onclick="tendSetBucket('${k}')">
       <div class="ts-v" style="color:${m.color}">${counts[k]||0}</div><div class="ts-l">${m.lbl}</div></div>`; }).join('');
 
