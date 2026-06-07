@@ -2605,3 +2605,152 @@ thead tr:not(.thead-groups) th {
 .medias-reg-linha td.num span.pos { color: var(--green); font-weight: 700; }
 .medias-reg-linha td.num span.neg { color: var(--red);   font-weight: 700; }
 .medias-reg-linha td.num .muted-dash { color: var(--muted); font-weight: 400; }
+
+/* ═══════════════════════════════════════════════════════════════════════ */
+/* VIEW: PROJEÇÃO — Tendência Desempenho × Lucratividade                    */
+/* ═══════════════════════════════════════════════════════════════════════ */
+.tend-intro {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--blue);
+  border-radius: 8px;
+  padding: 9px 14px;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--muted2);
+  margin-bottom: 12px;
+}
+.tend-summary {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.tend-sum {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: .12s;
+  position: relative;
+  overflow: hidden;
+}
+.tend-sum::after {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+}
+.tend-sum.tb-pos::after { background: var(--green); }
+.tend-sum.tb-vai::after { background: var(--blue); }
+.tend-sum.tb-lim::after { background: var(--yellow); }
+.tend-sum.tb-sem::after { background: var(--red); }
+.tend-sum.tb-ins::after { background: var(--muted); }
+.tend-sum:hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(0,0,0,.08); }
+.tend-sum.active { box-shadow: 0 0 0 2px var(--navy) inset; }
+.tend-sum .ts-v { font-family: var(--ff); font-weight: 800; font-size: 24px; line-height: 1; }
+.tend-sum .ts-l { font-size: 10px; font-weight: 700; color: var(--muted2); text-transform: uppercase; letter-spacing: .04em; margin-top: 4px; }
+
+.tend-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 10px;
+}
+.tend-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 11px 13px;
+  cursor: pointer;
+  transition: .12s;
+  border-left: 3px solid var(--border2);
+}
+.tend-card.tb-pos { border-left-color: var(--green); }
+.tend-card.tb-vai { border-left-color: var(--blue); }
+.tend-card.tb-lim { border-left-color: var(--yellow); }
+.tend-card.tb-sem { border-left-color: var(--red); }
+.tend-card.tb-ins { border-left-color: var(--muted); }
+.tend-card:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,.1); border-color: var(--border2); }
+.tc-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.tc-nome { font-family: var(--ff); font-weight: 700; font-size: 12.5px; color: var(--text); line-height: 1.2; }
+.tc-code { font-size: 10px; color: var(--muted); font-weight: 600; margin-top: 1px; }
+.tend-chip { font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .03em; border: 1.4px solid; border-radius: 20px; padding: 2px 9px; white-space: nowrap; }
+.tc-body { display: flex; align-items: center; gap: 10px; }
+.tc-spark { flex-shrink: 0; }
+.tc-nums { display: flex; flex-direction: column; }
+.tc-luc { font-family: var(--ff); font-weight: 800; font-size: 22px; line-height: 1; }
+.tc-sub { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-top: 2px; }
+.tc-slope { font-size: 10.5px; color: var(--muted2); font-weight: 700; margin-top: 3px; }
+.tc-verdict { margin-top: 9px; font-size: 11px; font-weight: 700; line-height: 1.3; border-top: 1px solid var(--surface2); padding-top: 7px; }
+.tend-conf { display: inline-block; font-size: 8.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; padding: 1px 6px; border-radius: 10px; margin-left: 4px; vertical-align: middle; }
+.tend-conf.c-alta  { background: var(--gs); color: var(--green); }
+.tend-conf.c-média { background: var(--ys); color: var(--yellow); }
+.tend-conf.c-baixa { background: var(--rs); color: var(--red); }
+.tend-empty { grid-column: 1/-1; text-align: center; color: var(--muted); padding: 40px; font-size: 13px; }
+
+/* Detalhe */
+.tend-detail-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(20,28,48,.5);
+  z-index: 500; align-items: center; justify-content: center; padding: 24px;
+}
+.tend-detail-overlay.show { display: flex; }
+.tend-detail {
+  background: var(--surface); border-radius: 14px; padding: 22px 24px;
+  width: 760px; max-width: 96%; max-height: 92vh; overflow-y: auto; position: relative;
+  box-shadow: 0 20px 60px rgba(0,0,0,.3);
+}
+.td-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; padding-right: 30px; }
+.td-nome { font-family: var(--ff); font-weight: 800; font-size: 18px; color: var(--text); }
+.td-meta { font-size: 11px; color: var(--muted2); margin-top: 3px; }
+.td-kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 14px; }
+.td-kpi { background: #fff; border: 1px solid var(--border); border-radius: 9px; padding: 9px 8px; text-align: center; }
+.td-kpi .tk-v { font-family: var(--ff); font-weight: 800; font-size: 15px; line-height: 1.1; color: var(--text); }
+.td-kpi .tk-l { font-size: 8.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; margin-top: 4px; font-weight: 700; }
+.td-chart { background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 12px 8px 4px; }
+.td-legend { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; margin: 10px 0; font-size: 10.5px; color: var(--muted2); font-weight: 600; }
+.td-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.tl-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.tl-dash { width: 18px; height: 0; border-top: 2px dashed var(--muted2); display: inline-block; }
+.td-verdict { background: #fff; border: 1px solid var(--border); border-left: 3px solid; border-radius: 9px; padding: 11px 14px; font-size: 12.5px; line-height: 1.5; color: var(--text); }
+.td-note { font-size: 10.5px; color: var(--muted); line-height: 1.5; margin-top: 10px; padding: 9px 12px; background: var(--surface2); border-radius: 8px; }
+@media (max-width: 720px) {
+  .tend-summary { grid-template-columns: repeat(2, 1fr); }
+  .td-kpis { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── Projeção v2: Momentum + Equilíbrio mensal ── */
+.tend-sum.mc-acc::after { background: var(--green); }
+.tend-sum.mc-rec::after { background: var(--blue); }
+.tend-sum.mc-est::after { background: var(--muted2); }
+.tend-sum.mc-per::after { background: var(--orange); }
+.tend-sum.mc-des::after { background: var(--red); }
+.tend-card.mc-acc { border-left-color: var(--green); }
+.tend-card.mc-rec { border-left-color: var(--blue); }
+.tend-card.mc-est { border-left-color: var(--muted2); }
+.tend-card.mc-per { border-left-color: var(--orange); }
+.tend-card.mc-des { border-left-color: var(--red); }
+.tend-card.mc-ins { border-left-color: var(--muted); }
+.tc-lucbadge { font-size: 9px; font-weight: 800; margin-left: 5px; }
+.tc-body { display: flex; align-items: center; gap: 12px; }
+.tc-ladder { flex-shrink: 0; }
+.tc-be { flex: 1; min-width: 0; }
+.tc-be-gauge { margin-bottom: 4px; }
+.tc-be-txt { font-size: 12px; font-weight: 800; line-height: 1.1; }
+.tend-flag { display: inline-block; margin-top: 3px; font-size: 9px; font-weight: 800; color: var(--red); background: var(--rs); padding: 1px 6px; border-radius: 10px; }
+.td-section-t { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--muted2); margin: 14px 0 6px; }
+.td-be-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 6px 2px; color: var(--muted2); }
+.td-be-row b { font-family: var(--ff); font-size: 13px; color: var(--text); }
+.tend-warn { grid-column: 1/-1; background: var(--ys); border: 1px solid var(--yellow); border-radius: 9px; padding: 10px 14px; font-size: 11.5px; line-height: 1.5; color: var(--muted2); margin-bottom: 4px; }
+.tend-summary { position: relative; }
+.tend-warn + * { } 
+
+/* ── Projeção v3: Crítico + competitividade (share) ── */
+.tend-summary { grid-template-columns: repeat(6, 1fr); }
+.tend-sum.mc-per::after { background: var(--yellow); }
+.tend-sum.mc-que::after { background: var(--orange); }
+.tend-sum.mc-cri::after { background: var(--red); }
+.tend-card.mc-per { border-left-color: var(--yellow); }
+.tend-card.mc-que { border-left-color: var(--orange); }
+.tend-card.mc-cri { border-left-color: var(--red); }
+.tc-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
+.comp-badge { font-size: 9px; font-weight: 800; white-space: nowrap; letter-spacing: .02em; }
+@media (max-width: 900px) { .tend-summary { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 560px) { .tend-summary { grid-template-columns: repeat(2, 1fr); } }

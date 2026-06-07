@@ -25,6 +25,7 @@
     <div class="view-tabs">
       <button class="view-tab active" id="vt-geral" onclick="switchView('geral')">📊 Geral</button>
       <button class="view-tab" id="vt-luc" onclick="switchView('luc')">💰 Lucratividade</button>
+      <button class="view-tab" id="vt-tend" onclick="switchView('tend')">📈 Tendência</button>
     </div>
   </div>
   <div class="hcounts">
@@ -413,6 +414,53 @@
     <div style="padding:8px 12px;background:var(--surface2);border-radius:8px;font-size:11px;color:var(--muted2);margin-top:12px">
       💡 <strong>Luc% ponderado</strong> = Σ Lucro R$ ÷ Σ Venda Líquida R$ do grupo (mesma fórmula da planilha oficial: LUCRATIVIDADE = LUCRO ÷ VENDA LÍQUIDA). <strong>Lucro R$ médio</strong> = média simples por setor.
     </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- VIEW: PROJEÇÃO — Tendência Desempenho × Lucratividade                  -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div id="view-tend" style="display:none">
+  <div class="fbar">
+    <div class="fbar-row">
+      <div class="fg"><label>Regional</label>
+        <select id="tf-reg" onchange="tendOnReg()"><option value="">Todas</option></select></div>
+      <div class="fg"><label>Distrital</label>
+        <select id="tf-dist" onchange="tendApply()"><option value="">Todas</option></select></div>
+      <div class="fsep"></div>
+      <div class="fg"><label>Linha</label>
+        <select id="tf-linha" onchange="tendLinha=this.value;renderTend()">
+          <option value="">Todas</option><option value="PRIME">PRIME</option><option value="INFINITY">INFINITY</option>
+        </select></div>
+      <div class="fsep"></div>
+      <div class="fg"><label>Ordenar por</label>
+        <select id="tf-sort" onchange="tendApply()">
+          <option value="gap">Mais precisa p/ equilíbrio</option>
+          <option value="queda">Pior tendência</option>
+          <option value="tri">Maior cresc. trimestre</option>
+          <option value="fat">Maior faturamento</option>
+        </select></div>
+      <div class="fsep"></div>
+      <div class="fg"><label>Buscar</label>
+        <input type="text" id="tf-search" placeholder="Nome ou código..." oninput="tendApply()"></div>
+      <span id="tend-count" style="margin-left:auto;font-size:10px;color:var(--muted);font-weight:700;white-space:nowrap"></span>
+    </div>
+  </div>
+
+  <div class="main" style="padding-top:8px">
+    <div class="tend-intro">
+      📈 <b>Tendência × Equilíbrio × Mercado.</b> A classificação segue o <b>nível de lucratividade</b> (setor muito negativo é Crítico, não importa a tendência). Para os demais, lemos a <b>tendência</b> comparando o ritmo do Trimestre com YTD e MAT (12m), o <b>equilíbrio mensal</b> (quanto de faturamento PPP falta/sobra para dar lucro) e a <b>competitividade vs mercado</b> (ganhando ou perdendo share). Clique num setor para o detalhe.
+    </div>
+    <div class="tend-summary" id="tend-summary"></div>
+    <div class="tend-grid" id="tend-grid"></div>
+  </div>
+</div>
+
+<!-- DETALHE DO SETOR (PROJEÇÃO) -->
+<div class="tend-detail-overlay" id="tend-detail-overlay" onclick="tendCloseDetailIfBg(event)">
+  <div class="tend-detail">
+    <button class="legend-modal-close" onclick="tendCloseDetail()" style="position:absolute;top:14px;right:16px">×</button>
+    <div id="tend-detail-body"></div>
   </div>
 </div>
 

@@ -18,6 +18,14 @@ const MESES_PTBR = {JAN:'JANEIRO',FEV:'FEVEREIRO',MAR:'MARÇO',ABR:'ABRIL',MAI:'
 let activeMeses = []; // months actually in the data
 let DESEMP_BY_MES = {}; // desempenho data keyed by month: { JAN: {code: {...}}, FEV: {...}, ... }
 
+// Base de preço bruto usada no painel de Equilíbrio mensal:
+//   'PL'  → usa o mesmo bruto da aba LUCRATIVIDADE (SUPERA R$ PL). Os quadros
+//           batem exato entre si e a conversão p/ líquido fica em 0,789 cravado.
+//   'PPP' → usa o PPP real do Desempenho (preço praticado; mais fiel ao mercado,
+//           porém o "médio atual" não fecha com PL ÷ nº de meses).
+// Independentemente da escolha, o painel é internamente consistente (alvoMes ↔ alvoLiq).
+const BASE_EQUILIBRIO = 'PL';
+
 let filtered = [], sortCol = 'classificacao', sortDir = 1, page = 0;
 const PS = 100;
 let activeTab = '', kpiF = '', viewM = 'ABR', negFilter = false, virouFilter = false, virouPosFilter = false;
@@ -772,6 +780,8 @@ async function processFiles() {
       const desemp = {};
       const allSheets = wb2.SheetNames;
       const ytdSheet   = allSheets.find(s => s === 'YTD') || null;
+      const matSheet   = allSheets.find(s => s === 'MAT') || null;
+      const trmSheet   = allSheets.find(s => s === 'TRM' || s === 'TRI') || null;
       const mesXmesSheet = allSheets.find(s => {
         const p = s.split(' X ');
         return p.length === 2 && p[0].trim() === p[1].trim() && p[0].trim().length === 3;
@@ -788,6 +798,8 @@ async function processFiles() {
 
       const sheetMap = [
         [ytdSheet,      'ytd'],
+        [matSheet,      'mat'],
+        [trmSheet,      'trm'],
         [mesXmesSheet,  'abrabr'],
         [mesXprevSheet, 'abramar'],
       ];
@@ -998,30 +1010,40 @@ async function processFiles() {
       savedAt: new Date().toISOString(),
     };
 
-    try {
-      localStorage.setItem('supera_data', JSON.stringify(dataset));
-    } catch(e) {
-      // If too large for localStorage, store without venda_mes details
-      const slim = { ...dataset };
-      slim.setores = setores.map(s => {
-        const r = {};
-        for (const k of Object.keys(s)) {
-          if (!k.startsWith('venda_mes_')) r[k] = s[k]; // sup_ytd_ is kept
-        }
-        return r;
-      });
-      // Slim desemp_by_mes: only keep ytd and abrabr (drop abramar) to save space
-      slim.desemp_by_mes = {};
+    // ── Persistência em camadas (localStorage tem cota ~5MB) ─────────────────
+    // O desemp_by_mes é o que mais pesa; MAT/TRM não são usados por mês (só no
+    // setor, p/ tendência), então saem da persistência. Cada tentativa é
+    // protegida: se nada couber, o app segue funcionando na sessão atual.
+    try { localStorage.removeItem('supera_data'); } catch(e) {}
+    const stripKeys = (obj, prefixes) => {
+      const r = {};
+      for (const k of Object.keys(obj)) if (!prefixes.some(p => k.startsWith(p))) r[k] = obj[k];
+      return r;
+    };
+    const slimDesemp = (drop) => {
+      const out = {};
       for (const [mes, dp] of Object.entries(desempByMes)) {
-        slim.desemp_by_mes[mes] = {};
-        for (const [code, d] of Object.entries(dp)) {
-          slim.desemp_by_mes[mes][code] = {};
-          for (const k of Object.keys(d)) {
-            if (!k.startsWith('abramar_')) slim.desemp_by_mes[mes][code][k] = d[k];
-          }
-        }
+        out[mes] = {};
+        for (const [code, d] of Object.entries(dp)) out[mes][code] = stripKeys(d, drop);
       }
-      localStorage.setItem('supera_data', JSON.stringify(slim));
+      return out;
+    };
+    const setoresNoVendaMes = () => setores.map(s => stripKeys(s, ['venda_mes_']));
+    const tiers = [
+      () => dataset,
+      () => ({ ...dataset, setores: setoresNoVendaMes(), desemp_by_mes: slimDesemp(['mat_', 'trm_']) }),
+      () => ({ ...dataset, setores: setoresNoVendaMes(), desemp_by_mes: slimDesemp(['mat_', 'trm_', 'abramar_']) }),
+      () => ({ ...dataset, setores: setoresNoVendaMes(), desemp_by_mes: slimDesemp(['mat_', 'trm_', 'abramar_', 'abrabr_']) }),
+      () => ({ ...dataset, setores: setoresNoVendaMes(), desemp_by_mes: {} }),
+    ];
+    let stored = false;
+    for (const make of tiers) {
+      try { localStorage.setItem('supera_data', JSON.stringify(make())); stored = true; break; }
+      catch (e) { try { localStorage.removeItem('supera_data'); } catch(_){} }
+    }
+    if (!stored) {
+      console.warn('Não foi possível salvar no navegador (cota excedida). Dados ativos só nesta sessão.');
+      alert('Os dados foram carregados e a análise está completa nesta sessão. Só não couberam para salvar no navegador — ao recarregar a página será preciso subir as planilhas de novo. Dica: feche outras abas/apps que usam o mesmo endereço (127.0.0.1:5500), pois eles dividem o mesmo espaço de armazenamento.');
     }
 
     prog.classList.remove('show');
@@ -1356,17 +1378,21 @@ let lucSortDir = 'desc';  // 'desc' = maior para menor, 'asc' = menor para maior
 function switchView(v) {
   currentView = v;
   document.getElementById('view-luc').style.display = v === 'luc' ? '' : 'none';
+  const vt = document.getElementById('view-tend');
+  if (vt) vt.style.display = v === 'tend' ? '' : 'none';
 
   // Hide/show geral-specific sections (fbar and main), but never the upload overlay
   const geralSections = document.querySelectorAll('.fbar, .main');
   geralSections.forEach(el => {
-    if (!el.closest('#view-luc') && !el.closest('#upload-overlay')) {
+    if (!el.closest('#view-luc') && !el.closest('#view-tend') && !el.closest('#upload-overlay')) {
       el.style.display = v === 'geral' ? '' : 'none';
     }
   });
 
   document.getElementById('vt-geral').classList.toggle('active', v === 'geral');
   document.getElementById('vt-luc').classList.toggle('active', v === 'luc');
+  const vtTab = document.getElementById('vt-tend');
+  if (vtTab) vtTab.classList.toggle('active', v === 'tend');
 
   // Always keep export button accessible
   const btnExp = document.getElementById('btn-export');
@@ -1375,6 +1401,9 @@ function switchView(v) {
   if (v === 'luc') {
     syncLucFilters();
     renderLuc();
+  } else if (v === 'tend') {
+    tendSyncFilters();
+    renderTend();
   }
 }
 
@@ -2298,3 +2327,314 @@ function closeLegendIfBg(e) {
 }
 
 // ── MÉDIAS MODAL ──────────────────────────────────────────────────────────────
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// VIEW: TENDÊNCIA — Tendência (TRI×YTD×MAT) + Equilíbrio Mensal
+// Tendência: compara o crescimento SUPERA por janela (mais recente → mais longa).
+// Equilíbrio: quanto de faturamento/mês falta para o setor dar lucro.
+// Usa campos já salvos: trm_/ytd_/mat_/abrabr_ *_sup_var, *_merc_var,
+//                       sup_ytd_M, luc_M, folga_pe.
+// ═══════════════════════════════════════════════════════════════════════════
+let tendReg = '', tendDist = '', tendLinha = '', tendSearch = '', tendBucket = '', tendSort = 'gap';
+const T_BAND = 1.5; // pp — banda de estabilidade do tendência
+
+const MOM = {
+  acelera:  {lbl:'Acelerando',     cls:'mc-acc', color:'var(--green)'},
+  recupera: {lbl:'Recuperando',    cls:'mc-rec', color:'var(--blue)'},
+  estavel:  {lbl:'Estável',        cls:'mc-est', color:'var(--muted2)'},
+  perde:    {lbl:'Desacelerando',  cls:'mc-per', color:'var(--yellow)'},
+  queda:    {lbl:'Em queda',       cls:'mc-que', color:'var(--orange)'},
+  critico:  {lbl:'Crítico',        cls:'mc-cri', color:'var(--red)'},
+  insuf:    {lbl:'Sem dados',      cls:'mc-ins', color:'var(--muted)'},
+};
+// Competitividade vs mercado (share) — 2º selo
+const COMP = {
+  ganha:  {lbl:'▲ ganhando share', color:'var(--green)'},
+  mantem: {lbl:'≈ mantém share',   color:'var(--muted2)'},
+  perde:  {lbl:'▼ perdendo share', color:'var(--red)'},
+  na:     {lbl:'', color:'var(--muted)'},
+};
+const QTREND = { menos:'↘ TRI caindo menos que o YTD', estavel:'→ TRI caindo no mesmo ritmo do YTD', mais:'↓ TRI caindo mais que o YTD' };
+const T_CRIT = -10; // luc% abaixo disso = Crítico (nível manda, independe da tendência)
+const tPP  = v => v==null ? '—' : (v>=0?'+':'') + v.toFixed(1) + '%';
+const tBRL = v => v==null ? '—' : (v<0?'−R$ ':'R$ ') + Math.abs(Math.round(v)).toLocaleString('pt-BR');
+
+// ── Tendência: crescimento SUPERA por janela ──────────────────────────────────
+// Lê a trajetória do longo (MAT) ao recente (TRI). Prioriza a VIRADA (recente
+// acima do histórico) e usa banda de ${T_BAND}pp para ignorar microdiferenças.
+// ── Tendência por janela (TRI×YTD×MAT) + competitividade vs mercado ──────────
+// Regra: o NÍVEL de lucratividade manda. Setor muito negativo é Crítico, não
+// importa a tendência. Perto/acima do equilíbrio, classifica pela direção.
+function tendMom(s){
+  const g = k => s[k]!=null ? s[k]*100 : null;
+  const tri=g('trm_sup_var'), ytd=g('ytd_sup_var'), mat=g('mat_sup_var'), mes=g('abrabr_sup_var');
+  const mTri=g('trm_merc_var'), mYtd=g('ytd_merc_var'), mMat=g('mat_merc_var'), mMes=g('abrabr_merc_var');
+  const lastM=activeMeses[activeMeses.length-1];
+  const luc = s['luc_'+lastM]!=null ? s['luc_'+lastM]*100 : null;
+  const o={tri,ytd,mat,mes,mMes,mTri,mYtd,mMat,luc};
+  if ([tri,ytd,mat].some(v=>v==null) || luc==null){ o.cat='insuf'; o.comp='na'; return o; }
+  const B=T_BAND, dQ=tri-ytd, dM=tri-mat;        // recente vs YTD e vs MAT (12m)
+  const turnaround = mat<0 && tri>=0;             // histórico negativo, recente voltou ao positivo
+  o.turnaround = turnaround;
+
+  let cat;
+  if (luc < T_CRIT)        cat='critico';          // muito abaixo do equilíbrio → o nível manda
+  else if (luc < 0)        cat = (turnaround || tri>=5) ? 'recupera' : 'critico'; // levemente negativo: sobe se cresce
+  else if (tri < 0)        cat='queda';            // lucrativo, mas encolhendo
+  else if (dQ > B)         cat='acelera';
+  else if (dQ < -B && dM < -B) cat='perde';        // só desacelera se abaixo do YTD E do MAT — quem está acima do ritmo de 12m não é penalizado
+  else                     cat='estavel';
+  o.cat=cat;
+  o.quedaTrend = dQ>B ? 'menos' : (dQ<-B ? 'mais' : 'estavel');
+
+  // competitividade vs mercado no trimestre (setor cresce acima/abaixo do mercado = ganha/perde share)
+  const vsM = (mTri!=null) ? tri-mTri : null;
+  o.vsMerc = vsM;
+  o.comp = vsM==null ? 'na' : (vsM > 1 ? 'ganha' : (vsM < -1 ? 'perde' : 'mantem'));
+  return o;
+}
+
+// ── Equilíbrio mensal: faturamento bruto/mês para dar lucro ──────────────────
+// O break-even nasce em venda líquida (despesa fixa / margem de contribuição).
+// Convertendo pela razão líquido/bruto do próprio setor:  alvo_bruto = bruto_YTD / (1+folga/100).
+// A base do bruto (PL da lucratividade ou PPP do desempenho) segue BASE_EQUILIBRIO.
+function tendBE(s){
+  const lastM=activeMeses[activeMeses.length-1];
+  const nM=activeMeses.length, folga=s.folga_pe;
+  if (folga==null || nM<1) return null;
+  const pl = s['sup_ytd_'+lastM];   // bruto da aba LUCRATIVIDADE (SUPERA R$ PL)
+  const ppp = s.ytd_sup_atual;      // bruto do Desempenho (PPP real)
+  // Escolhe a base conforme o flag; se a preferida faltar, cai para a outra (fallback real).
+  let bruto, base, fallback=false;
+  if (BASE_EQUILIBRIO==='PPP'){
+    if (ppp!=null){ bruto=ppp; base='PPP'; } else if (pl!=null){ bruto=pl; base='PL'; fallback=true; }
+  } else {
+    if (pl!=null){ bruto=pl; base='PL'; } else if (ppp!=null){ bruto=ppp; base='PPP'; fallback=true; }
+  }
+  if (bruto==null) return null;
+  const alvoMes=bruto/(1+folga/100)/nM, curMes=bruto/nM;
+  const net=s['venda_ytd_'+lastM];
+  // Razão calculada sobre o MESMO bruto usado acima → alvoMes e alvoLiq sempre coerentes.
+  const ratio=(net!=null && bruto) ? net/bruto : 0.789323; // líquido/bruto
+  return {alvoMes, curMes, gap:alvoMes-curMes, folga, base, fallback, alvoLiq:alvoMes*ratio,
+          lucPct: s['luc_'+lastM]!=null ? s['luc_'+lastM]*100 : null, lastM};
+}
+
+// ── Mini-escada de tendência (3 barras: TRI no topo → MAT na base) ─────────────
+function momLadder(o){
+  const W=120, H=46, pad=3, rowH=12, gap=2, cx=W/2;
+  if (o.cat==='insuf') return `<svg width="${W}" height="${H}"></svg>`;
+  const vals=[['TRI',o.tri],['YTD',o.ytd],['MAT',o.mat]];
+  const mx=Math.max(4, ...vals.map(v=>Math.abs(v[1])));
+  const half=(W/2)-16;
+  let bars='';
+  vals.forEach(([lbl,v],i)=>{
+    const y=pad+i*(rowH+gap);
+    const w=Math.max(1,Math.abs(v)/mx*half);
+    const x=v>=0?cx:cx-w;
+    const col=v>=0?'var(--green)':'var(--red)';
+    bars+=`<text x="2" y="${y+rowH-2}" font-size="7.5" font-weight="700" fill="var(--muted2)">${lbl}</text>`;
+    bars+=`<rect x="${x.toFixed(1)}" y="${y}" width="${w.toFixed(1)}" height="${rowH-2}" rx="1.5" fill="${col}" opacity="${i===0?1:(i===1?.7:.45)}"/>`;
+    bars+=`<text x="${(v>=0?x+w+2:x-2).toFixed(1)}" y="${y+rowH-3}" font-size="7" font-weight="700" fill="${col}" text-anchor="${v>=0?'start':'end'}">${tPP(v)}</text>`;
+  });
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+    <line x1="${cx}" y1="${pad-1}" x2="${cx}" y2="${pad+3*(rowH+gap)-gap}" stroke="var(--border2)" stroke-width="1"/>
+    ${bars}</svg>`;
+}
+
+// ── Medidor de equilíbrio mensal (com tooltip ao passar o mouse) ─────────────
+function beGauge(be, big){
+  if (!be) return '';
+  const W=big?420:150, H=big?40:26;
+  const max=Math.max(be.alvoMes, be.curMes)*1.12;
+  const sx=v=>Math.max(0,Math.min(1,v/max))*(W-2);
+  const curW=sx(be.curMes), alvoX=sx(be.alvoMes);
+  const ok=be.gap<=0, col=ok?'var(--green)':'var(--red)';
+  const gapTxt = (be.gap>0?'falta ':'folga ') + tBRL(Math.abs(be.gap)) + '/mês';
+  const tAtual = `Faturamento atual: ${tBRL(be.curMes)}/mês`;
+  const tAlvo  = `Equilíbrio: ${tBRL(be.alvoMes)}/mês (${gapTxt})`;
+  const trackY=H/2-6;
+  return `<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="max-width:${W}px">
+    <rect x="0" y="${trackY}" width="${W}" height="12" rx="3" fill="var(--surface2)"><title>Faixa de faturamento mensal</title></rect>
+    <rect x="0" y="${trackY}" width="${curW.toFixed(1)}" height="12" rx="3" fill="${col}" opacity=".8"><title>${tAtual}</title></rect>
+    <line x1="${alvoX.toFixed(1)}" y1="2" x2="${alvoX.toFixed(1)}" y2="${H-2}" stroke="var(--text)" stroke-width="1.6" stroke-dasharray="3 2"/>
+    <rect x="${(alvoX-6).toFixed(1)}" y="0" width="12" height="${H}" fill="transparent" style="cursor:help"><title>${tAlvo}</title></rect>
+    ${big?`<text x="${alvoX.toFixed(1)}" y="${H-1}" font-size="8" fill="var(--text)" text-anchor="middle">equilíbrio</text>`:''}
+  </svg>`;
+}
+
+// ── Barras de tendência por janela (detalhe): SUP vs mercado ──────────────────
+function momBars(o){
+  const W=520, H=210, pl=42, pr=16, pt=18, pb=26;
+  const rows=[['MÊS',o.mes,o.mes!=null],['TRI',o.tri,true],['YTD',o.ytd,true],['MAT',o.mat,true]];
+  const merc={'MÊS':o.mMes,'TRI':o.mTri,'YTD':o.mYtd,'MAT':o.mMat};
+  const all=rows.flatMap(r=>[r[1]]).concat([o.mMes,o.mTri,o.mYtd,o.mMat]).filter(v=>v!=null);
+  const mx=Math.max(4,...all.map(Math.abs));
+  const cx=pl+(W-pl-pr)/2;
+  const half=(W-pl-pr)/2-30;
+  const sx=v=>cx + (v/mx)*half;
+  const n=rows.length, bandH=(H-pt-pb)/n;
+  const NOME_JANELA={'MÊS':'Mês','TRI':'Trimestre','YTD':'Ano (YTD)','MAT':'12 meses (MAT)'};
+  let svg=`<line x1="${cx}" y1="${pt-4}" x2="${cx}" y2="${H-pb}" stroke="var(--border2)" stroke-width="1"/>
+    <text x="${cx}" y="${H-pb+14}" font-size="9" fill="var(--muted)" text-anchor="middle">0%</text>`;
+  rows.forEach(([lbl,v],i)=>{
+    const yc=pt+i*bandH+bandH/2;
+    const mv=merc[lbl];
+    // Texto do tooltip: o que é + o número (+ share, quando há mercado)
+    const partes=[];
+    if (v!=null)  partes.push(`Crescimento SUPERA: ${tPP(v)}`);
+    if (mv!=null) partes.push(`Mercado: ${tPP(mv)}`);
+    if (v!=null && mv!=null){
+      const gap=v-mv;
+      partes.push(`${gap>=0?'Ganhando':'Perdendo'} share (${tPP(gap)})`);
+    }
+    const tip=`${NOME_JANELA[lbl]||lbl} — ${partes.join(' · ')}`;
+    svg+=`<text x="6" y="${yc+1}" font-size="9.5" font-weight="800" fill="var(--muted2)">${lbl}</text>`;
+    if (v!=null){
+      const w=Math.abs(v)/mx*half, x=v>=0?cx:cx-w, col=v>=0?'var(--green)':'var(--red)';
+      svg+=`<rect x="${x.toFixed(1)}" y="${(yc-8).toFixed(1)}" width="${w.toFixed(1)}" height="11" rx="2" fill="${col}"><title>${tip}</title></rect>`;
+      svg+=`<text x="${(v>=0?x+w+3:x-3).toFixed(1)}" y="${(yc+1).toFixed(1)}" font-size="9" font-weight="700" fill="${col}" text-anchor="${v>=0?'start':'end'}">${tPP(v)}</text>`;
+    }
+    if (mv!=null){ const mxp=sx(mv);
+      svg+=`<line x1="${mxp.toFixed(1)}" y1="${(yc-11).toFixed(1)}" x2="${mxp.toFixed(1)}" y2="${(yc+6).toFixed(1)}" stroke="var(--navy)" stroke-width="2"/>`;
+    }
+    // Área transparente cobrindo a linha toda → passar o mouse em qualquer ponto mostra o tooltip
+    svg+=`<rect x="${pl}" y="${(yc-bandH/2).toFixed(1)}" width="${(W-pl-pr).toFixed(1)}" height="${bandH.toFixed(1)}" fill="transparent" style="cursor:help"><title>${tip}</title></rect>`;
+  });
+  return `<svg width="100%" viewBox="0 0 ${W} ${H}" style="max-width:${W}px">${svg}
+    <text x="${pl}" y="12" font-size="9" font-weight="700" fill="var(--muted2)">Crescimento SUPERA por janela (barra) · mercado (traço azul)</text></svg>`;
+}
+
+// ── Lista filtrada/ordenada ───────────────────────────────────────────────────
+function tendBuild(s){ const m=tendMom(s); const be=tendBE(s); return {s, code:s.code, nome:s.nome, m, be}; }
+function tendPass(s){
+  if (tendReg && s.regional!==tendReg) return false;
+  if (tendDist && s.distrital!==tendDist) return false;
+  if (tendLinha && s.linha!==tendLinha) return false;
+  if (tendSearch){ const q=tendSearch.toLowerCase(); if(!(`${s.nome} ${s.code}`.toLowerCase().includes(q))) return false; }
+  return true;
+}
+function tendFilteredList(){
+  const list=[];
+  SETORES.forEach(s=>{ if(!tendPass(s))return; const o=tendBuild(s); if(tendBucket && o.m.cat!==tendBucket)return; list.push(o); });
+  const momOrd={critico:0,queda:1,perde:2,estavel:3,recupera:4,acelera:5,insuf:6};
+  if (tendSort==='gap')        list.sort((a,b)=>(b.be?.gap??-1e12)-(a.be?.gap??-1e12));   // precisa mais primeiro
+  else if (tendSort==='tri')   list.sort((a,b)=>(b.m.tri??-1e9)-(a.m.tri??-1e9));
+  else if (tendSort==='queda') list.sort((a,b)=>(momOrd[a.m.cat])-(momOrd[b.m.cat]) || (a.m.tri??0)-(b.m.tri??0));
+  else if (tendSort==='fat')   list.sort((a,b)=>(b.s['sup_ytd_'+(b.be?.lastM||activeMeses[activeMeses.length-1])]??0)-(a.s['sup_ytd_'+(a.be?.lastM||activeMeses[activeMeses.length-1])]??0));
+  return list;
+}
+
+function renderTend(){
+  const grid=document.getElementById('tend-grid'), sum=document.getElementById('tend-summary');
+  if (!SETORES.length){ grid.innerHTML=''; sum.innerHTML='<div class="tend-empty">Carregue as planilhas para ver a análise.</div>'; return; }
+  const counts={acelera:0,recupera:0,estavel:0,perde:0,queda:0,critico:0,insuf:0};
+  SETORES.forEach(s=>{ if(!tendPass(s))return; counts[tendMom(s).cat]++; });
+  const order=['acelera','recupera','estavel','perde','queda','critico'];
+  if (counts.insuf>0) order.push('insuf');
+  sum.innerHTML = order.map(k=>{ const m=MOM[k]; const act=tendBucket===k?' active':'';
+    return `<div class="tend-sum ${m.cls}${act}" onclick="tendSetBucket('${k}')">
+      <div class="ts-v" style="color:${m.color}">${counts[k]||0}</div><div class="ts-l">${m.lbl}</div></div>`; }).join('');
+
+  // Aviso: dados de tendência ausentes (planilhas processadas por versão antiga, sem MAT/TRM)
+  const totalFilt=Object.values(counts).reduce((a,b)=>a+b,0);
+  let warn='';
+  if (counts.insuf>0 && counts.insuf >= totalFilt*0.5){
+    warn=`<div class="tend-warn">⚠ <b>Tendência indisponível</b> para a maioria dos setores. As planilhas foram processadas por uma versão anterior, sem as abas <b>MAT</b> e <b>TRM</b>. Vá em <b>Planilhas → Limpar dados salvos</b> e suba novamente a lucratividade + o desempenho para habilitar a análise de tendência. O equilíbrio mensal já funciona.</div>`;
+  }
+  sum.innerHTML = warn + sum.innerHTML;
+
+  const list=tendFilteredList();
+  document.getElementById('tend-count').textContent=`${list.length} setor${list.length===1?'':'es'}`;
+  if (!list.length){ grid.innerHTML='<div class="tend-empty">Nenhum setor para este filtro.</div>'; return; }
+  grid.innerHTML=list.map(o=>{
+    const m=MOM[o.m.cat]; const be=o.be;
+    const gapTxt = be ? (be.gap>0 ? `<span style="color:var(--red)">Falta ${tBRL(be.gap)}/mês</span>` : `<span style="color:var(--green)">Folga ${tBRL(-be.gap)}/mês</span>`) : '';
+    const lucTxt = be && be.lucPct!=null ? `<span class="tc-lucbadge" style="color:${be.lucPct>=0?'var(--green)':'var(--red)'}">luc ${tPP(be.lucPct)}</span>` : '';
+    const shrink = o.m.cat==='queda' ? `<span class="tend-flag">${QTREND[o.m.quedaTrend]}</span>` : '';
+    const comp = COMP[o.m.comp]; const compBadge = (o.m.comp && o.m.comp!=='na') ? `<span class="comp-badge" style="color:${comp.color}">${comp.lbl}</span>` : '';
+    return `<div class="tend-card ${m.cls}" onclick="tendOpenDetail('${o.code}')">
+      <div class="tc-top">
+        <div class="tc-id"><div class="tc-nome">${o.nome||o.code}</div><div class="tc-code">${o.code} ${lucTxt}${o.s.linha ? `<span class="linha-badge lb-${o.s.linha.toLowerCase()}">${o.s.linha}</span>` : ''}</div></div>
+        <div class="tc-badges"><span class="tend-chip" style="color:${m.color};border-color:${m.color}">${m.lbl}</span>${compBadge}</div>
+      </div>
+      <div class="tc-body">
+        <div class="tc-ladder">${momLadder(o.m)}</div>
+        <div class="tc-be">
+          <div class="tc-be-gauge">${beGauge(be,false)}</div>
+          <div class="tc-be-txt">${gapTxt}</div>
+          ${shrink}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function tendSetBucket(k){ tendBucket=(tendBucket===k?'':k); renderTend(); }
+function tendOnReg(){ tendReg=document.getElementById('tf-reg').value; tendDist=''; tendFillDist(); renderTend(); }
+function tendFillDist(){
+  const fd=document.getElementById('tf-dist'); fd.innerHTML='<option value="">Todas</option>'; const seen=new Set();
+  SETORES.forEach(s=>{ if(tendReg && s.regional!==tendReg)return; if(seen.has(s.distrital))return; seen.add(s.distrital);
+    const o=document.createElement('option'); o.value=s.distrital; o.textContent=s.distrital_nome||s.distrital; fd.appendChild(o); });
+  fd.value='';
+}
+function tendApply(){ tendDist=document.getElementById('tf-dist').value; tendSearch=document.getElementById('tf-search').value; tendSort=document.getElementById('tf-sort').value; renderTend(); }
+function tendSyncFilters(){
+  const r=document.getElementById('tf-reg'); r.innerHTML='<option value="">Todas</option>';
+  Object.entries(REGIONAIS).forEach(([code,name])=>{ const o=document.createElement('option'); o.value=code; o.textContent=name; r.appendChild(o); });
+  tendFillDist();
+}
+
+// ── Detalhe ───────────────────────────────────────────────────────────────────
+function tendVerdict(m, be){
+  const txt = {
+    acelera:`<b style="color:var(--green)">Acelerando</b> — o trimestre (${tPP(m.tri)}) cresce acima do YTD (${tPP(m.ytd)}) e do MAT (${tPP(m.mat)})`,
+    recupera:`<b style="color:var(--blue)">Recuperando</b> — ainda abaixo do equilíbrio, mas ${m.turnaround?`saindo de um histórico negativo de 12m (MAT ${tPP(m.mat)})`:`crescendo forte`} (trimestre ${tPP(m.tri)}) — puxando a lucratividade para cima`,
+    estavel:`<b>Estável</b> — lucrativo e com crescimento parelho (trimestre ${tPP(m.tri)}, YTD ${tPP(m.ytd)})`,
+    perde:`<b style="color:var(--yellow)">Desacelerando</b> — ainda lucrativo, mas o trimestre (${tPP(m.tri)}) ficou abaixo do YTD (${tPP(m.ytd)}) e do ritmo de 12 meses / MAT (${tPP(m.mat)})`,
+    queda:`<b style="color:var(--orange)">Em queda</b> — lucrativo, mas o trimestre virou negativo (${tPP(m.tri)})` + (m.quedaTrend==='menos'?`, caindo menos que o YTD — ritmo de queda diminuindo`:m.quedaTrend==='mais'?`, abaixo do YTD — queda se aprofundando`:` — caindo no mesmo ritmo do YTD`),
+    critico:`<b style="color:var(--red)">Crítico</b> — lucratividade em ${tPP(m.luc)}, bem abaixo do equilíbrio` + (m.tri>=5?` (mesmo com o trimestre crescendo ${tPP(m.tri)} — o ritmo ainda não cobre o tamanho do prejuízo)`:m.tri<0?` e ainda encolhendo no trimestre (${tPP(m.tri)})`:``),
+    insuf:`Sem dados de tendência por janela`,
+  }[m.cat];
+  let beTxt='';
+  if (be){ beTxt = be.gap>0
+      ? `. Precisa de <b style="color:var(--red)">${tBRL(be.gap)}/mês em PPP</b> para chegar ao equilíbrio (fatura ${tBRL(be.curMes)}/mês, alvo ${tBRL(be.alvoMes)}/mês).`
+      : `. Opera com <b style="color:var(--green)">folga de ${tBRL(-be.gap)}/mês</b> acima do equilíbrio.`; }
+  const comp=COMP[m.comp];
+  const compTxt = (m.comp && m.comp!=='na')
+    ? ` No trimestre está <b style="color:${comp.color}">${m.comp==='ganha'?'ganhando share':m.comp==='perde'?'perdendo share':'mantendo share'}</b> (cresce ${tPP(m.tri)} vs mercado ${tPP(m.mTri)}).`
+    : '';
+  return txt + beTxt + compTxt;
+}
+function tendOpenDetail(code){
+  const s=SETORES.find(x=>x.code===code); if(!s)return;
+  const m=tendMom(s), be=tendBE(s), meta=MOM[m.cat];
+  document.getElementById('tend-detail-body').innerHTML=`
+    <div class="td-head">
+      <div><div class="td-nome">${s.nome||''}</div>
+        <div class="td-meta">Setor ${s.code} · ${s.regional_nome||s.regional} / ${s.distrital_nome||s.distrital} ${s.linha?`· <span class="linha-badge lb-${(s.linha||'').toLowerCase()}">${s.linha}</span>`:''}</div></div>
+      <span class="tend-chip" style="color:${meta.color};border-color:${meta.color};font-size:13px;padding:5px 12px">${meta.lbl}</span>
+    </div>
+    <div class="td-kpis">
+      <div class="td-kpi"><div class="tk-v" style="color:${(be&&be.lucPct>=0)?'var(--green)':'var(--red)'}">${be?tPP(be.lucPct):'—'}</div><div class="tk-l">Lucratividade YTD</div></div>
+      <div class="td-kpi"><div class="tk-v" style="color:${m.tri>=0?'var(--green)':'var(--red)'}">${tPP(m.tri)}</div><div class="tk-l">Cresc. Trimestre</div></div>
+      <div class="td-kpi"><div class="tk-v" style="color:${m.ytd>=0?'var(--green)':'var(--red)'}">${tPP(m.ytd)}</div><div class="tk-l">Cresc. YTD</div></div>
+      <div class="td-kpi"><div class="tk-v" style="color:${m.mat>=0?'var(--green)':'var(--red)'}">${tPP(m.mat)}</div><div class="tk-l">Cresc. MAT (12m)</div></div>
+      <div class="td-kpi"><div class="tk-v" style="color:${be?(be.gap>0?'var(--red)':'var(--green)'):''}">${be?(be.gap>0?'−'+tBRL(be.gap).replace('R$ ','R$ '):tBRL(-be.gap)):'—'}</div><div class="tk-l">${be&&be.gap>0?'Falta /mês':'Folga /mês'}</div></div>
+    </div>
+    <div class="td-section-t">Tendência por janela</div>
+    <div class="td-chart">${momBars(m)}</div>
+    <div class="td-section-t">Equilíbrio mensal — quanto falta de faturamento (PPP) para dar lucro</div>
+    <div class="td-chart" style="padding:14px 16px">
+      ${beGauge(be,true)}
+      <div class="td-be-row"><span>Faturamento PPP médio atual</span><b>${be?tBRL(be.curMes):'—'}/mês</b></div>
+      <div class="td-be-row"><span>Faturamento PPP de equilíbrio</span><b>${be?tBRL(be.alvoMes):'—'}/mês</b></div>
+      <div class="td-be-row"><span>${be&&be.gap>0?'Falta':'Folga'} (PPP)</span><b style="color:${be?(be.gap>0?'var(--red)':'var(--green)'):''}">${be?tBRL(Math.abs(be.gap)):'—'}/mês</b></div>
+      <div class="td-be-row" style="border-top:1px solid var(--border);color:var(--muted)"><span>equivale, em venda líquida, a um alvo de</span><b style="color:var(--muted2)">${be?tBRL(be.alvoLiq):'—'}/mês</b></div>
+    </div>
+    <div class="td-verdict" style="border-color:${meta.color}">${tendVerdict(m,be)}</div>
+    <div class="td-note">A <b>classificação segue o nível de lucratividade</b>: setor abaixo de ${T_CRIT}% é Crítico, independentemente da tendência. <b>Tendência por janela</b> = crescimento SUPERA (R$) de cada janela vs igual período do ano anterior, do mais recente (Trimestre) ao MAT (12 meses); o <b>share</b> compara o crescimento do setor com o do mercado no trimestre. Equilíbrio em faturamento <b>bruto</b>: o ponto de equilíbrio (em venda líquida) é convertido pela razão líquido/bruto do próprio setor${be?` (${(be.alvoLiq/be.alvoMes).toLocaleString('pt-BR',{maximumFractionDigits:4})})`:''}. A <b>despesa fixa é rateada por igual entre os PVs</b> e não considera CPV por marca — é referência de gestão.${be&&be.fallback?` <b>(Bruto preferido (${BASE_EQUILIBRIO}) ausente neste setor — usando ${be.base}.)</b>`:''}</div>`;
+  document.getElementById('tend-detail-overlay').classList.add('show');
+}
+function tendCloseDetail(){ document.getElementById('tend-detail-overlay').classList.remove('show'); }
+function tendCloseDetailIfBg(e){ if(e.target===document.getElementById('tend-detail-overlay')) tendCloseDetail(); }
