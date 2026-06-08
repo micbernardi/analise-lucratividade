@@ -811,7 +811,7 @@ async function processFiles() {
         for (let r = 0; r < rows2.length; r++) {
           if (rows2[r].includes('CARGO')) { hRow = r; break; }
         }
-        const h = rows2[hRow].map(c => String(c || ''));
+        const h = Array.from(rows2[hRow] || [], c => String(c || ''));
         const nomI  = h.indexOf('NOME');
         const carI  = h.indexOf('CARGO');
         const maNI  = h.indexOf('MERC. ANT');
@@ -819,7 +819,7 @@ async function processFiles() {
         const mvI   = h.findIndex((c,i)=>c==='VARIAÇÃO %'&&i>0);
         const saNI  = h.indexOf('SUP. ANT');
         const saCI  = h.indexOf('SUP. ATUAL');
-        const svI   = h.findIndex((c,i)=>c.startsWith('VARIAÇÃO')&&i>saNI);
+        const svI   = h.findIndex((c,i)=>typeof c==='string'&&c.startsWith('VARIAÇÃO')&&i>saNI);
         const shaNI = h.indexOf('SHARE ANT.');
         const shaCI = h.indexOf('SHARE ATUAL');
         const shvI  = shaCI >= 0 ? shaCI + 1 : -1;
