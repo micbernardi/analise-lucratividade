@@ -1372,6 +1372,7 @@ let currentView = 'geral';
 let lucViewM = 'ABR';
 let lucLinhaVal = '';
 let lucNegFilter = false, lucVirouFilter = false, lucVirouPosFilter = false;
+let lucFaixaFilter = ''; // '' | 'pos' | 'f1' | 'f2' | 'f3' | 'f4' | 'neg'
 let lucFocusedCol = null; // which column is expanded
 let lucSortDir = 'desc';  // 'desc' = maior para menor, 'asc' = menor para maior
 
@@ -1542,6 +1543,42 @@ const lucClassLabels = {
 };
 const lucClassOrder = ['critico','alerta','atencao','atencao-leve','saudavel'];
 
+// ── FAIXAS DE LUCRATIVIDADE (%) na view Lucratividade ────────────────────────
+function setLucFaixa(val){
+  lucFaixaFilter = (lucFaixaFilter === val) ? '' : (val || '');
+  renderLuc();
+}
+function lucFaixaMatch(f){
+  if (!lucFaixaFilter) return true;
+  if (f == null) return false;
+  if (lucFaixaFilter === 'pos') return f !== 'neg';
+  return f === lucFaixaFilter;
+}
+function renderLucFaixas(rows){
+  const bar = document.getElementById('luc-faixas');
+  if (!bar) return;
+  const cnt = { f1:0, f2:0, f3:0, f4:0, neg:0 };
+  rows.forEach(s => { if (cnt[s._faixa] != null) cnt[s._faixa]++; });
+  const ttPos = cnt.f1 + cnt.f2 + cnt.f3 + cnt.f4;
+  const ttNeg = cnt.neg;
+  const ttGeral = ttPos + ttNeg;
+  const pct = (n, base) => base > 0 ? (n / base * 100).toFixed(1).replace('.', ',') + '%' : '—';
+  const act = k => lucFaixaFilter === k ? ' active' : '';
+  const chip = (k, label, val, p, cls) => `
+    <div class="tfx ${cls}${act(k)}" onclick="setLucFaixa('${k}')" title="Filtrar: ${label}">
+      <div class="tfx-v">${val}</div>
+      <div class="tfx-meta"><div class="tfx-l">${label}</div><div class="tfx-p">${p}</div></div>
+    </div>`;
+  bar.innerHTML =
+    chip('f1', '0,1–5%',     cnt.f1, pct(cnt.f1, ttPos), 'tfx-f1') +
+    chip('f2', '5–10%',      cnt.f2, pct(cnt.f2, ttPos), 'tfx-f2') +
+    chip('f3', '10,1–13,3%', cnt.f3, pct(cnt.f3, ttPos), 'tfx-f3') +
+    chip('f4', '≥ 13,4%',    cnt.f4, pct(cnt.f4, ttPos), 'tfx-f4') +
+    `<span class="tfx-div"></span>` +
+    chip('pos', 'TT Positivos', ttPos, pct(ttPos, ttGeral), 'tfx-pos') +
+    chip('neg', 'TT Negativos', ttNeg, pct(ttNeg, ttGeral), 'tfx-neg');
+}
+
 function renderLuc() {
   if (!SETORES.length) return;
   const reg   = document.getElementById('lf-reg').value;
@@ -1569,13 +1606,20 @@ function renderLuc() {
     return true;
   });
 
-  // Attach lucro value and class for current month
+  // Attach lucro value, R$ class and faixa% for current month
   data = data.map(s => ({
     ...s,
     _lucro: s['lucro_' + lucViewM] ?? null,
     _luc:   s['luc_'   + lucViewM] ?? null,
     _class: lucClassify(s['lucro_' + lucViewM] ?? null),
-  })).filter(s => s._class !== null);
+    _faixa: lucFaixa(s['luc_' + lucViewM] ?? null),
+  }));
+
+  // Barra de faixas (%) — facetada: reflete todos os filtros MENOS o de faixa
+  renderLucFaixas(data.filter(s => s._faixa !== null));
+
+  // Grade: aplica filtro de faixa e mantém o eixo R$ (precisa de _class)
+  data = data.filter(s => s._class !== null && lucFaixaMatch(s._faixa));
 
   // Sort: critico first, then alerta, atencao, atencao-leve, saudavel; within each by lucro asc
   data.sort((a,b) => {
@@ -1584,7 +1628,10 @@ function renderLuc() {
     return (a._lucro??0) - (b._lucro??0);
   });
 
-  document.getElementById('luc-count').textContent = data.length + ' setores';
+  const faixaLbl = lucFaixaFilter
+    ? (lucFaixaFilter === 'pos' ? ' · faixa: Positivos' : ' · faixa: ' + (FX_ABBR[lucFaixaFilter] || ''))
+    : '';
+  document.getElementById('luc-count').textContent = data.length + ' setores' + faixaLbl;
 
   // Summary strip
   const counts = {};
@@ -1698,7 +1745,8 @@ async function exportLucExcel() {
     _lucro: s['lucro_' + lucViewM] ?? null,
     _luc:   s['luc_'   + lucViewM] ?? null,
     _class: lucClassify(s['lucro_' + lucViewM] ?? null),
-  })).filter(s => s._class !== null)
+    _faixa: lucFaixa(s['luc_' + lucViewM] ?? null),
+  })).filter(s => s._class !== null && lucFaixaMatch(s._faixa))
     .sort((a,b) => {
       const oi = lucClassOrder.indexOf(a._class) - lucClassOrder.indexOf(b._class);
       return oi !== 0 ? oi : (a._lucro??0) - (b._lucro??0);
@@ -2208,7 +2256,8 @@ async function exportLucExcel() {
     _lucro: s['lucro_' + lucViewM] ?? null,
     _luc:   s['luc_'   + lucViewM] ?? null,
     _class: lucClassify(s['lucro_' + lucViewM] ?? null),
-  })).filter(s => s._class !== null)
+    _faixa: lucFaixa(s['luc_' + lucViewM] ?? null),
+  })).filter(s => s._class !== null && lucFaixaMatch(s._faixa))
     .sort((a,b) => {
       const oi = lucClassOrder.indexOf(a._class) - lucClassOrder.indexOf(b._class);
       return oi !== 0 ? oi : (a._lucro??0) - (b._lucro??0);
@@ -2337,6 +2386,7 @@ function closeLegendIfBg(e) {
 //                       sup_ytd_M, luc_M, folga_pe.
 // ═══════════════════════════════════════════════════════════════════════════
 let tendReg = '', tendDist = '', tendLinha = '', tendSearch = '', tendBucket = '', tendSort = 'gap';
+let tendFaixaFilter = ''; // '' | 'pos' | 'f1' | 'f2' | 'f3' | 'f4' | 'neg'
 const T_BAND = 1.5; // pp — banda de estabilidade do tendência
 
 const MOM = {
@@ -2508,6 +2558,45 @@ function momBars(o){
 
 // ── Lista filtrada/ordenada ───────────────────────────────────────────────────
 function tendBuild(s){ const m=tendMom(s); const be=tendBE(s); return {s, code:s.code, nome:s.nome, m, be}; }
+
+// ── FAIXAS DE LUCRATIVIDADE (%) — conceito do quadro ─────────────────────────
+// Classifica pelo % de lucratividade do último mês (lucro ÷ venda líquida).
+function lucFaixa(pct){
+  if (pct == null) return null;
+  if (pct < 0)     return 'neg';   // Negativos
+  if (pct < 0.05)  return 'f1';    // De 0,1% a 5%
+  if (pct < 0.10)  return 'f2';    // De 5% a 10%
+  if (pct < 0.134) return 'f3';    // De 10,1% até 13,3%
+  return 'f4';                     // Acima de 13,4%
+}
+const lucFaixaOrderPos = ['f1','f2','f3','f4'];
+const lucFaixaMeta = {
+  f1:  { label: 'De 0,1% a 5%',       cls: 'lf-f1'  },
+  f2:  { label: 'De 5% a 10%',        cls: 'lf-f2'  },
+  f3:  { label: 'De 10,1% até 13,3%', cls: 'lf-f3'  },
+  f4:  { label: 'Acima de 13,4%',     cls: 'lf-f4'  },
+  neg: { label: 'TT Negativos',       cls: 'lf-neg' },
+};
+// abreviações para o selo dentro do card
+const FX_ABBR = { f1:'0,1–5%', f2:'5–10%', f3:'10,1–13,3%', f4:'≥ 13,4%', neg:'Negativo' };
+function tendFaixaOf(s){
+  const lastM = activeMeses[activeMeses.length-1];
+  return lucFaixa(s['luc_'+lastM] ?? null);
+}
+function tendFaixaPass(s){
+  if (!tendFaixaFilter) return true;
+  const f = tendFaixaOf(s);
+  if (f == null) return false;
+  if (tendFaixaFilter === 'pos') return f !== 'neg';
+  return f === tendFaixaFilter;
+}
+function tendSetFaixa(val){
+  tendFaixaFilter = (tendFaixaFilter === val) ? '' : (val || '');
+  const sel = document.getElementById('tf-faixa');
+  if (sel) sel.value = tendFaixaFilter;
+  renderTend();
+}
+
 function tendPass(s){
   if (tendReg && s.regional!==tendReg) return false;
   if (tendDist && s.distrital!==tendDist) return false;
@@ -2517,7 +2606,7 @@ function tendPass(s){
 }
 function tendFilteredList(){
   const list=[];
-  SETORES.forEach(s=>{ if(!tendPass(s))return; const o=tendBuild(s); if(tendBucket && o.m.cat!==tendBucket)return; list.push(o); });
+  SETORES.forEach(s=>{ if(!tendPass(s))return; if(!tendFaixaPass(s))return; const o=tendBuild(s); if(tendBucket && o.m.cat!==tendBucket)return; list.push(o); });
   const momOrd={critico:0,queda:1,perde:2,estavel:3,recupera:4,acelera:5,insuf:6};
   if (tendSort==='gap')        list.sort((a,b)=>(b.be?.gap??-1e12)-(a.be?.gap??-1e12));   // precisa mais primeiro
   else if (tendSort==='tri')   list.sort((a,b)=>(b.m.tri??-1e9)-(a.m.tri??-1e9));
@@ -2530,7 +2619,7 @@ function renderTend(){
   const grid=document.getElementById('tend-grid'), sum=document.getElementById('tend-summary');
   if (!SETORES.length){ grid.innerHTML=''; sum.innerHTML='<div class="tend-empty">Carregue as planilhas para ver a análise.</div>'; return; }
   const counts={acelera:0,recupera:0,estavel:0,perde:0,queda:0,critico:0,insuf:0};
-  SETORES.forEach(s=>{ if(!tendPass(s))return; counts[tendMom(s).cat]++; });
+  SETORES.forEach(s=>{ if(!tendPass(s))return; if(!tendFaixaPass(s))return; counts[tendMom(s).cat]++; });
   const order=['acelera','recupera','estavel','perde','queda','critico'];
   if (counts.insuf>0) order.push('insuf');
   const totalTodos = Object.values(counts).reduce((a,b)=>a+b,0);
@@ -2550,6 +2639,10 @@ function renderTend(){
 
   const list=tendFilteredList();
   document.getElementById('tend-count').textContent=`${list.length} setor${list.length===1?'':'es'}`;
+
+  // Tabela de faixas (%) — reflete escopo + bucket de momentum, MENOS o filtro de faixa
+  renderTendFaixas();
+
   if (!list.length){ grid.innerHTML='<div class="tend-empty">Nenhum setor para este filtro.</div>'; return; }
   grid.innerHTML=list.map(o=>{
     const m=MOM[o.m.cat]; const be=o.be;
@@ -2557,9 +2650,10 @@ function renderTend(){
     const lucTxt = be && be.lucPct!=null ? `<span class="tc-lucbadge" style="color:${be.lucPct>=0?'var(--green)':'var(--red)'}">luc ${tPP(be.lucPct)}</span>` : '';
     const shrink = o.m.cat==='queda' ? `<span class="tend-flag">${QTREND[o.m.quedaTrend]}</span>` : '';
     const comp = COMP[o.m.comp]; const compBadge = (o.m.comp && o.m.comp!=='na') ? `<span class="comp-badge" style="color:${comp.color}">${comp.lbl}</span>` : '';
+    const fx = tendFaixaOf(o.s); const faixaBadge = fx ? `<span class="tc-faixa tcf-${fx}" title="Faixa de lucratividade">${FX_ABBR[fx]}</span>` : '';
     return `<div class="tend-card ${m.cls}" onclick="tendOpenDetail('${o.code}')">
       <div class="tc-top">
-        <div class="tc-id"><div class="tc-nome">${o.nome||o.code}</div><div class="tc-code">${o.code} ${lucTxt}${o.s.linha ? `<span class="linha-badge lb-${o.s.linha.toLowerCase()}">${o.s.linha}</span>` : ''}</div></div>
+        <div class="tc-id"><div class="tc-nome">${o.nome||o.code}</div><div class="tc-code">${o.code} ${lucTxt}${faixaBadge}${o.s.linha ? `<span class="linha-badge lb-${o.s.linha.toLowerCase()}">${o.s.linha}</span>` : ''}</div></div>
         <div class="tc-badges"><span class="tend-chip" style="color:${m.color};border-color:${m.color}">${m.lbl}</span>${compBadge}</div>
       </div>
       <div class="tc-body">
@@ -2573,6 +2667,40 @@ function renderTend(){
     </div>`;
   }).join('');
 }
+// ── Barra compacta "Faixas de Lucratividade (%)" — filtro + totais ───────────
+function renderTendFaixas(){
+  const bar = document.getElementById('tend-faixas');
+  if (!bar) return;
+
+  const cnt = { f1:0, f2:0, f3:0, f4:0, neg:0 };
+  SETORES.forEach(s => {
+    if (!tendPass(s)) return;                       // escopo: reg/dist/linha/busca
+    if (tendBucket && tendMom(s).cat !== tendBucket) return; // respeita o bucket de momentum
+    const f = tendFaixaOf(s);                        // mas NÃO o filtro de faixa
+    if (f != null && cnt[f] != null) cnt[f]++;
+  });
+
+  const ttPos   = cnt.f1 + cnt.f2 + cnt.f3 + cnt.f4;
+  const ttNeg   = cnt.neg;
+  const ttGeral = ttPos + ttNeg;
+  const pct = (n, base) => base > 0 ? (n / base * 100).toFixed(1).replace('.', ',') + '%' : '—';
+  const act = k => tendFaixaFilter === k ? ' active' : '';
+  const chip = (k, label, val, p, cls) => `
+    <div class="tfx ${cls}${act(k)}" onclick="tendSetFaixa('${k}')" title="Filtrar: ${label}">
+      <div class="tfx-v">${val}</div>
+      <div class="tfx-meta"><div class="tfx-l">${label}</div><div class="tfx-p">${p}</div></div>
+    </div>`;
+
+  bar.innerHTML =
+    chip('f1', '0,1–5%',     cnt.f1, pct(cnt.f1, ttPos), 'tfx-f1') +
+    chip('f2', '5–10%',      cnt.f2, pct(cnt.f2, ttPos), 'tfx-f2') +
+    chip('f3', '10,1–13,3%', cnt.f3, pct(cnt.f3, ttPos), 'tfx-f3') +
+    chip('f4', '≥ 13,4%',    cnt.f4, pct(cnt.f4, ttPos), 'tfx-f4') +
+    `<span class="tfx-div"></span>` +
+    chip('pos', 'TT Positivos', ttPos, pct(ttPos, ttGeral), 'tfx-pos') +
+    chip('neg', 'TT Negativos', ttNeg, pct(ttNeg, ttGeral), 'tfx-neg');
+}
+
 function tendSetBucket(k){ tendBucket=(tendBucket===k?'':k); renderTend(); }
 function tendOnReg(){ tendReg=document.getElementById('tf-reg').value; tendDist=''; tendFillDist(); renderTend(); }
 function tendFillDist(){

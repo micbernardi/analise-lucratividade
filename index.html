@@ -386,6 +386,11 @@
 
   <!-- SUMMARY CARDS -->
   <div class="main" style="padding-top:6px">
+
+    <!-- FILTRO POR FAIXA DE LUCRATIVIDADE (%) -->
+    <div class="tend-cap">Filtro por Faixa de Lucratividade <span>· clique numa faixa para filtrar por atingimento</span></div>
+    <div class="tfx-bar" id="luc-faixas"></div>
+
     <div class="luc-summary" id="luc-summary"></div>
 
     <!-- GRID -->
@@ -441,6 +446,17 @@
           <option value="fat">Faturamento (maior → menor)</option>
         </select></div>
       <div class="fsep"></div>
+      <div class="fg"><label>Faixa lucr.%</label>
+        <select id="tf-faixa" onchange="tendSetFaixa(this.value)">
+          <option value="">Todas</option>
+          <option value="pos">Positivos (todas)</option>
+          <option value="f1">De 0,1% a 5%</option>
+          <option value="f2">De 5% a 10%</option>
+          <option value="f3">De 10,1% até 13,3%</option>
+          <option value="f4">Acima de 13,4%</option>
+          <option value="neg">Negativos</option>
+        </select></div>
+      <div class="fsep"></div>
       <div class="fg"><label>Buscar</label>
         <input type="text" id="tf-search" placeholder="Nome ou código..." oninput="tendApply()"></div>
       <span id="tend-count" style="margin-left:auto;font-size:10px;color:var(--muted);font-weight:700;white-space:nowrap"></span>
@@ -451,7 +467,13 @@
     <div class="tend-intro">
       📈 <b>Tendência × Equilíbrio × Mercado.</b> A classificação segue o <b>nível de lucratividade</b> (setor muito negativo é Crítico, não importa a tendência). Para os demais, lemos a <b>tendência</b> comparando o ritmo do Trimestre com YTD e MAT (12m), o <b>equilíbrio mensal</b> (quanto de faturamento PPP falta/sobra para dar lucro) e a <b>competitividade vs mercado</b> (ganhando ou perdendo share). Clique num setor para o detalhe.
     </div>
+    <div class="tend-cap">Filtro por Tendência <span>· clique num card para filtrar por momentum</span></div>
     <div class="tend-summary" id="tend-summary"></div>
+
+    <!-- FAIXAS DE LUCRATIVIDADE (%) — filtro compacto + totais -->
+    <div class="tend-cap">Filtro por Faixa de Lucratividade <span>· clique numa faixa para filtrar por atingimento</span></div>
+    <div class="tfx-bar" id="tend-faixas"></div>
+
     <div class="tend-grid" id="tend-grid"></div>
   </div>
 </div>

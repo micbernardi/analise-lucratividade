@@ -2078,6 +2078,131 @@ thead tr:not(.thead-groups) th {
   color: #15803d
 }
 
+/* ── Título de seção dos filtros (Tendência / Faixa) ── */
+.tend-cap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--ff);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--navy);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  margin: 4px 0 8px
+}
+.tend-cap::before {
+  content: '';
+  width: 4px;
+  height: 15px;
+  border-radius: 2px;
+  background: var(--navy)
+}
+.tend-cap span {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: none;
+  letter-spacing: 0
+}
+
+/* ── Faixas lucr.% — barra compacta de filtro + totais (Tendência) ── */
+.tfx-bar {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+  justify-content: flex-start
+}
+.tfx-cap { display: none }
+.tfx {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  position: relative;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 8px 14px 8px 16px;
+  cursor: pointer;
+  transition: .12s
+}
+.tfx::after {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px
+}
+.tfx:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, .08)
+}
+.tfx.active {
+  box-shadow: 0 0 0 2px var(--navy) inset
+}
+.tfx-v {
+  font-family: var(--ff);
+  font-weight: 800;
+  font-size: 21px;
+  line-height: 1;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0
+}
+.tfx-meta {
+  line-height: 1.15
+}
+.tfx-l {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: .03em;
+  white-space: nowrap
+}
+.tfx-p {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text);
+  margin-top: 1px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1
+}
+.tfx-f1::after  { background: var(--muted) }
+.tfx-f2::after  { background: var(--yellow) }
+.tfx-f3::after  { background: var(--blue) }
+.tfx-f4::after  { background: var(--green) }
+.tfx-f4 { background: #e6f4ec }
+.tfx-pos::after { background: var(--navy) }
+.tfx-neg::after { background: var(--red) }
+.tfx-div {
+  flex: 0 0 1px;
+  width: 1px;
+  background: var(--border2);
+  margin: 2px 3px;
+  align-self: stretch
+}
+
+/* selo de faixa dentro do card do setor */
+.tc-faixa {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 800;
+  border-radius: 20px;
+  padding: 1px 7px;
+  margin-left: 5px;
+  letter-spacing: .02em;
+  white-space: nowrap;
+  vertical-align: middle
+}
+.tcf-f1  { background: var(--surface2); color: var(--muted2) }
+.tcf-f2  { background: var(--ys); color: var(--yellow) }
+.tcf-f3  { background: var(--bs); color: var(--blue) }
+.tcf-f4  { background: var(--gs); color: var(--green) }
+.tcf-neg { background: var(--rs); color: var(--red) }
+
 /* ── Column layout ── */
 .luc-grid {
   display: grid;
@@ -2621,23 +2746,27 @@ thead tr:not(.thead-groups) th {
   margin-bottom: 12px;
 }
 .tend-summary {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-start;
   margin-bottom: 14px;
 }
 .tend-sum {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
   background: #fff;
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 12px;
+  border-radius: 9px;
+  padding: 8px 16px 8px 16px;
   cursor: pointer;
   transition: .12s;
   position: relative;
   overflow: hidden;
 }
 .tend-sum::after {
-  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
 }
 .tend-sum.tb-pos::after { background: var(--green); }
 .tend-sum.tb-vai::after { background: var(--blue); }
@@ -2646,8 +2775,8 @@ thead tr:not(.thead-groups) th {
 .tend-sum.tb-ins::after { background: var(--muted); }
 .tend-sum:hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(0,0,0,.08); }
 .tend-sum.active { box-shadow: 0 0 0 2px var(--navy) inset; }
-.tend-sum .ts-v { font-family: var(--ff); font-weight: 800; font-size: 24px; line-height: 1; }
-.tend-sum .ts-l { font-size: 10px; font-weight: 700; color: var(--muted2); text-transform: uppercase; letter-spacing: .04em; margin-top: 4px; }
+.tend-sum .ts-v { font-family: var(--ff); font-weight: 800; font-size: 21px; line-height: 1; flex-shrink: 0; }
+.tend-sum .ts-l { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 
 .tend-grid {
   display: grid;
@@ -2728,7 +2857,7 @@ thead tr:not(.thead-groups) th {
 .tend-card.mc-per { border-left-color: var(--orange); }
 .tend-card.mc-des { border-left-color: var(--red); }
 .tend-card.mc-ins { border-left-color: var(--muted); }
-.tc-lucbadge { font-size: 9px; font-weight: 800; margin-left: 5px; }
+.tc-lucbadge { font-size: 13px; font-weight: 800; margin-left: 6px; }
 .tc-body { display: flex; align-items: center; gap: 12px; }
 .tc-ladder { flex-shrink: 0; }
 .tc-be { flex: 1; min-width: 0; }
@@ -2738,7 +2867,7 @@ thead tr:not(.thead-groups) th {
 .td-section-t { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--muted2); margin: 14px 0 6px; }
 .td-be-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 6px 2px; color: var(--muted2); }
 .td-be-row b { font-family: var(--ff); font-size: 13px; color: var(--text); }
-.tend-warn { grid-column: 1/-1; background: var(--ys); border: 1px solid var(--yellow); border-radius: 9px; padding: 10px 14px; font-size: 11.5px; line-height: 1.5; color: var(--muted2); margin-bottom: 4px; }
+.tend-warn { flex: 0 0 100%; grid-column: 1/-1; background: var(--ys); border: 1px solid var(--yellow); border-radius: 9px; padding: 10px 14px; font-size: 11.5px; line-height: 1.5; color: var(--muted2); margin-bottom: 4px; }
 .tend-summary { position: relative; }
 .tend-warn + * { } 
 
