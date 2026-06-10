@@ -1962,8 +1962,8 @@ thead tr:not(.thead-groups) th {
 .luc-summary {
   display: flex;
   gap: 0;
-  margin-bottom: 16px;
-  border-radius: 12px;
+  margin-bottom: 12px;
+  border-radius: 10px;
   overflow: hidden;
   box-shadow: 0 2px 12px rgba(0, 0, 0, .08);
   border: 1px solid rgba(0, 0, 0, .06)
@@ -1971,10 +1971,10 @@ thead tr:not(.thead-groups) th {
 
 .luc-scard {
   flex: 1;
-  padding: 16px 20px;
+  padding: 8px 14px;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 1px;
   border-right: 1px solid rgba(0, 0, 0, .06);
   position: relative;
   overflow: hidden
@@ -1996,24 +1996,24 @@ thead tr:not(.thead-groups) th {
 .luc-scard-n {
   font-family: var(--ff);
   font-weight: 900;
-  font-size: 36px;
+  font-size: 22px;
   line-height: 1;
-  letter-spacing: -1px
+  letter-spacing: -.5px
 }
 
 .luc-scard-l {
-  font-size: 11px;
+  font-size: 9.5px;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: .1em;
-  margin-top: 3px;
+  letter-spacing: .08em;
+  margin-top: 2px;
   color: #000
 }
 
 .luc-scard-sub {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
-  margin-top: 2px;
+  margin-top: 1px;
   opacity: .75;
   color: #000
 }
@@ -2554,6 +2554,21 @@ thead tr:not(.thead-groups) th {
   vertical-align: middle;
   text-align: center;
 }
+/* ── Faixas view: header badges legíveis sobre fundo navy + grupos ── */
+.medias-fx-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .04em;
+}
+.medias-fx-badge.fx-prime    { background: #c7d2fe; color: #1e1b4b; }
+.medias-fx-badge.fx-infinity { background: #fde68a; color: #4a2e05; }
+.medias-table.medias-faixas thead th { vertical-align: bottom; }
+.medias-table.medias-faixas thead tr.fx-grp-top th { border-bottom: 1px solid var(--navy-light); }
+.medias-table.medias-faixas thead tr.fx-grp-sub th { padding-top: 6px; padding-bottom: 8px; font-size: 9px; }
+.medias-table.medias-faixas .fx-reg-sep { border-left: 2px solid var(--border); }
 .medias-table td:first-child { text-align: left; }
 .medias-table td.num {
   text-align: center;
@@ -2748,25 +2763,25 @@ thead tr:not(.thead-groups) th {
 .tend-summary {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   justify-content: flex-start;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 .tend-sum {
   display: inline-flex;
   align-items: center;
-  gap: 11px;
+  gap: 7px;
   background: #fff;
   border: 1px solid var(--border);
-  border-radius: 9px;
-  padding: 8px 16px 8px 16px;
+  border-radius: 8px;
+  padding: 5px 11px 5px 12px;
   cursor: pointer;
   transition: .12s;
   position: relative;
   overflow: hidden;
 }
 .tend-sum::after {
-  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
 }
 .tend-sum.tb-pos::after { background: var(--green); }
 .tend-sum.tb-vai::after { background: var(--blue); }
@@ -2775,8 +2790,8 @@ thead tr:not(.thead-groups) th {
 .tend-sum.tb-ins::after { background: var(--muted); }
 .tend-sum:hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(0,0,0,.08); }
 .tend-sum.active { box-shadow: 0 0 0 2px var(--navy) inset; }
-.tend-sum .ts-v { font-family: var(--ff); font-weight: 800; font-size: 21px; line-height: 1; flex-shrink: 0; }
-.tend-sum .ts-l { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.tend-sum .ts-v { font-family: var(--ff); font-weight: 800; font-size: 15px; line-height: 1; flex-shrink: 0; }
+.tend-sum .ts-l { font-size: 9px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 
 .tend-grid {
   display: grid;

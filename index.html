@@ -387,10 +387,6 @@
   <!-- SUMMARY CARDS -->
   <div class="main" style="padding-top:6px">
 
-    <!-- FILTRO POR FAIXA DE LUCRATIVIDADE (%) -->
-    <div class="tend-cap">Filtro por Faixa de Lucratividade <span>· clique numa faixa para filtrar por atingimento</span></div>
-    <div class="tfx-bar" id="luc-faixas"></div>
-
     <div class="luc-summary" id="luc-summary"></div>
 
     <!-- GRID -->
@@ -413,6 +409,7 @@
         <button class="ctab" id="mg-reg" onclick="setMediasGrupo('regional',this)" style="font-size:11px;padding:4px 10px">Por Regional</button>
         <button class="ctab" id="mg-dist" onclick="setMediasGrupo('distrital',this)" style="font-size:11px;padding:4px 10px">Por Distrital</button>
         <button class="ctab" id="mg-reg-linha" onclick="setMediasGrupo('regional_linha',this)" style="font-size:11px;padding:4px 10px">Regional × Linha</button>
+        <button class="ctab" id="mg-faixas" onclick="setMediasGrupo('faixas',this)" style="font-size:11px;padding:4px 10px">Faixas de Luc%</button>
       </div>
     </div>
     <div id="medias-content" style="max-height:60vh;overflow-y:auto"></div>

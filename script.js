@@ -1615,11 +1615,10 @@ function renderLuc() {
     _faixa: lucFaixa(s['luc_' + lucViewM] ?? null),
   }));
 
-  // Barra de faixas (%) — facetada: reflete todos os filtros MENOS o de faixa
-  renderLucFaixas(data.filter(s => s._faixa !== null));
+  // Faixas (%) removidas da view Lucratividade — filtro disponível apenas na view Tendência
 
-  // Grade: aplica filtro de faixa e mantém o eixo R$ (precisa de _class)
-  data = data.filter(s => s._class !== null && lucFaixaMatch(s._faixa));
+  // Grade: mantém o eixo R$ (precisa de _class)
+  data = data.filter(s => s._class !== null);
 
   // Sort: critico first, then alerta, atencao, atencao-leve, saudavel; within each by lucro asc
   data.sort((a,b) => {
@@ -1867,6 +1866,7 @@ function closeLegendIfBg(e) {
 // ── MÉDIAS MODAL ──────────────────────────────────────────────────────────────
 let mediasGrupo = 'linha';
 let mediasViewM = null;
+let mediasFaixaDim = 'linha'; // 'linha' | 'regional' — dimensão das colunas na visão Faixas
 
 function openMedias() {
   if (!SETORES.length) return;
@@ -1887,8 +1887,8 @@ function openMedias() {
     msel.appendChild(b);
   });
   // Activate default group button
-  ['linha','regional','distrital','regional_linha'].forEach(g => {
-    const idMap = { linha: 'mg-linha', regional: 'mg-reg', distrital: 'mg-dist', regional_linha: 'mg-reg-linha' };
+  ['linha','regional','distrital','regional_linha','faixas'].forEach(g => {
+    const idMap = { linha: 'mg-linha', regional: 'mg-reg', distrital: 'mg-dist', regional_linha: 'mg-reg-linha', faixas: 'mg-faixas' };
     const btn = document.getElementById(idMap[g]);
     if (btn) btn.classList.toggle('t-all', g === mediasGrupo);
   });
@@ -1906,7 +1906,7 @@ function closeMediasIfBg(e) {
 function setMediasGrupo(g, btn) {
   mediasGrupo = g;
   renderMedias._sortCol = 'label'; renderMedias._sortDir = 1;
-  ['mg-linha','mg-reg','mg-dist','mg-reg-linha'].forEach(id => {
+  ['mg-linha','mg-reg','mg-dist','mg-reg-linha','mg-faixas'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.classList.remove('t-all');
   });
@@ -2170,6 +2170,193 @@ function renderMedias() {
     }
     container.innerHTML = thtml;
     return; // early return — we rendered directly, skip generic table below
+
+  } else if (mediasGrupo === 'faixas') {
+    // ── FAIXAS DE LUCRATIVIDADE × LINHA / REGIONAL / LINHA×REGIONAL ──────────
+    // Classifica cada setor pela faixa de luc% YTD do mês (mesma régua: lucFaixa)
+    // e mostra, por coluna, quantos setores e o % do total da coluna em cada faixa.
+    title = 'Faixas de Lucratividade';
+
+    const setoresFx = setores
+      .map(s => ({ s, fx: lucFaixa(s['luc_' + m] ?? null) }))
+      .filter(o => o.fx !== null);
+
+    // ── Linhas da tabela: faixas (melhor → pior) ──
+    const fxRows = [
+      { fx: 'f4',  label: 'Acima de 13,4%',     color: 'var(--green)'  },
+      { fx: 'f3',  label: 'De 10,1% até 13,3%', color: 'var(--blue)'   },
+      { fx: 'f2',  label: 'De 5% a 10%',        color: 'var(--yellow)' },
+      { fx: 'f1',  label: 'De 0,1% a 5%',       color: 'var(--muted)'  },
+      { fx: 'neg', label: 'Negativos',          color: 'var(--red)'    },
+    ];
+    const countFx = (list, fx) => list.filter(o => o.fx === fx).length;
+    const posOf   = list => list.filter(o => o.fx !== 'neg').length;
+    const fmtPct  = (n, base) => base > 0 ? (n / base * 100).toFixed(1).replace('.', ',') + '%' : '—';
+
+    // Badge legível p/ cabeçalho (sobre navy)
+    const hdrBadge = l =>
+        l === 'PRIME'    ? '<span class="medias-fx-badge fx-prime">PRIME</span>'
+      : l === 'INFINITY' ? '<span class="medias-fx-badge fx-infinity">INFINITY</span>'
+      : l;
+
+    // Célula: % grande + (n setores) + mini-barra proporcional
+    const cell = (n, base, color, extraCls = '') => {
+      const p = base > 0 ? n / base * 100 : 0;
+      return `<td class="num ${extraCls}" style="min-width:90px">
+        <div style="font-weight:800;font-size:14px">${fmtPct(n, base)}</div>
+        <div style="font-size:10px;color:var(--muted)">${n} setor${n === 1 ? '' : 'es'}</div>
+        <div style="height:4px;border-radius:2px;background:var(--surface2);margin-top:3px;overflow:hidden">
+          <div style="height:100%;width:${p.toFixed(1)}%;background:${color};border-radius:2px"></div>
+        </div>
+      </td>`;
+    };
+
+    // ── Sub-toggle de dimensão das colunas ──
+    const dimBtn = (val, lbl) => `
+      <button class="ctab${mediasFaixaDim === val ? ' t-all' : ''}" style="font-size:11px;padding:4px 10px"
+        onclick="mediasFaixaDim='${val}';renderMedias()">${lbl}</button>`;
+
+    const toolbar = `
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">${title} — YTD ${m}</div>
+        <div style="display:flex;gap:6px;margin-left:auto;align-items:center;flex-wrap:wrap">
+          <span style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em">Colunas:</span>
+          ${dimBtn('linha', 'Por Linha')}
+          ${dimBtn('regional', 'Por Regional')}
+          ${dimBtn('linha_regional', 'Linha × Regional')}
+        </div>
+      </div>`;
+
+    const tip = `Faixa = Lucro ÷ Venda Líquida (YTD ${m}), mesma régua da view Lucratividade. % das faixas positivas é sobre o TT Positivos da coluna (igual à planilha oficial); TT Positivos e Negativos são sobre o total geral da coluna.`;
+
+    let thtml = toolbar + `<div style="overflow-x:auto"><table class="medias-table medias-faixas">`;
+
+    if (mediasFaixaDim === 'linha_regional') {
+      // ── Colunas agrupadas: Regional → (PRIME, INFINITY) + Total geral ──
+      const linhaOrder = ['PRIME', 'INFINITY'];
+      const linhasPresentes = [...new Set(setoresFx.map(o => o.s.linha || '—'))];
+      const linhas = [...linhaOrder.filter(l => linhasPresentes.includes(l)),
+                      ...linhasPresentes.filter(l => !linhaOrder.includes(l))];
+
+      const regMap = {};
+      setoresFx.forEach(o => { if (!regMap[o.s.regional]) regMap[o.s.regional] = o.s.regional_nome || o.s.regional; });
+      const regs = Object.entries(regMap).sort((a, b) => a[1].localeCompare(b[1]));
+
+      const grupo = {}; // regional|linha → list
+      setoresFx.forEach(o => {
+        const k = o.s.regional + '|' + (o.s.linha || '—');
+        (grupo[k] = grupo[k] || []).push(o);
+      });
+      const listOf = (reg, l) => grupo[reg + '|' + l] || [];
+
+      // Cabeçalho duplo
+      thtml += `<thead>
+        <tr class="fx-grp-top">
+          <th rowspan="2" style="min-width:170px;text-align:left">Faixa de Luc% <span style="font-weight:400;text-transform:none;font-size:9px" title="${tip}">YTD ${m} ⓘ</span></th>`;
+      regs.forEach(([code, nome]) => {
+        thtml += `<th class="num fx-reg-sep" colspan="${linhas.length}">${nome}</th>`;
+      });
+      thtml += `<th class="num fx-reg-sep" rowspan="2" style="min-width:90px">${hdrBadge('')}<div>Geral</div><div style="font-weight:400;font-size:9px;text-transform:none;opacity:.8">${setoresFx.length} set.</div></th>`;
+      thtml += `</tr><tr class="fx-grp-sub">`;
+      regs.forEach(([code]) => {
+        linhas.forEach((l, i) => {
+          thtml += `<th class="num${i === 0 ? ' fx-reg-sep' : ''}">${hdrBadge(l)}<div style="font-weight:400;font-size:9px;text-transform:none;opacity:.8">${listOf(code, l).length} set.</div></th>`;
+        });
+      });
+      thtml += `</tr></thead><tbody>`;
+
+      const renderDataRow = (labelHtml, dotColor, pickN, baseFn, isTotal) => {
+        thtml += `<tr class="${isTotal ? 'row-total' : ''}">
+          <td style="white-space:nowrap">${dotColor ? `<span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${dotColor};margin-right:7px;vertical-align:-1px"></span>` : ''}<strong>${labelHtml}</strong></td>`;
+        regs.forEach(([code]) => {
+          linhas.forEach((l, i) => {
+            const list = listOf(code, l);
+            thtml += cell(pickN(list), baseFn(list), dotColor || 'var(--navy)', i === 0 ? 'fx-reg-sep' : '');
+          });
+        });
+        thtml += cell(pickN(setoresFx), baseFn(setoresFx), dotColor || 'var(--navy)', 'fx-reg-sep');
+        thtml += `</tr>`;
+      };
+
+      // Faixas positivas: base = TT Positivos da coluna (igual planilha oficial).
+      // Negativos: base = total geral da coluna.
+      fxRows.forEach(r => renderDataRow(
+        r.label, r.color,
+        list => countFx(list, r.fx),
+        r.fx === 'neg' ? (list => list.length) : posOf,
+        false
+      ));
+      renderDataRow('TT Positivos <span style="font-size:10px;color:var(--muted);font-weight:400">(≥ 0%)</span>', null, posOf, list => list.length, true);
+
+      // Total da coluna
+      thtml += `<tr class="row-total"><td><strong>Total da coluna</strong></td>`;
+      regs.forEach(([code]) => {
+        linhas.forEach((l, i) => {
+          const n = listOf(code, l).length;
+          thtml += `<td class="num${i === 0 ? ' fx-reg-sep' : ''}"><div style="font-weight:800;font-size:14px">${n}</div><div style="font-size:10px;color:var(--muted)">100%</div></td>`;
+        });
+      });
+      thtml += `<td class="num fx-reg-sep"><div style="font-weight:800;font-size:14px">${setoresFx.length}</div><div style="font-size:10px;color:var(--muted)">100%</div></td></tr>`;
+      thtml += `</tbody>`;
+
+    } else {
+      // ── Colunas simples: Por Linha OU Por Regional ──
+      let cols = [];
+      if (mediasFaixaDim === 'linha') {
+        const order = ['PRIME', 'INFINITY'];
+        const grupos = {};
+        setoresFx.forEach(o => { const k = o.s.linha || '—'; (grupos[k] = grupos[k] || []).push(o); });
+        const keys = [...order.filter(k => grupos[k]), ...Object.keys(grupos).filter(k => !order.includes(k))];
+        cols = keys.map(k => ({ key: k, label: hdrBadge(k), list: grupos[k] }));
+      } else {
+        const grupos = {};
+        setoresFx.forEach(o => {
+          const k = o.s.regional;
+          if (!grupos[k]) grupos[k] = { nome: o.s.regional_nome || o.s.regional, list: [] };
+          grupos[k].list.push(o);
+        });
+        cols = Object.values(grupos).sort((a, b) => a.nome.localeCompare(b.nome))
+          .map(g => ({ key: g.nome, label: `<strong>${g.nome}</strong>`, list: g.list }));
+      }
+      cols.push({ key: '__total__', label: '<strong>Geral</strong>', list: setoresFx });
+
+      thtml += `<thead><tr>
+          <th style="min-width:170px;text-align:left">Faixa de Luc% <span style="font-weight:400;text-transform:none;font-size:9px" title="${tip}">YTD ${m} ⓘ</span></th>
+          ${cols.map(c => `<th class="num" style="white-space:nowrap">${c.label}<div style="font-weight:400;font-size:9px;text-transform:none;opacity:.8">${c.list.length} setores</div></th>`).join('')}
+        </tr></thead><tbody>`;
+
+      // Faixas positivas: base = TT Positivos da coluna (igual planilha oficial).
+      // Negativos: base = total geral da coluna.
+      fxRows.forEach(r => {
+        thtml += `<tr><td style="white-space:nowrap"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${r.color};margin-right:7px;vertical-align:-1px"></span><strong>${r.label}</strong></td>`;
+        cols.forEach(c => {
+          const base = r.fx === 'neg' ? c.list.length : posOf(c.list);
+          thtml += cell(countFx(c.list, r.fx), base, r.color);
+        });
+        thtml += `</tr>`;
+      });
+
+      thtml += `<tr class="row-total"><td><strong>TT Positivos</strong> <span style="font-size:10px;color:var(--muted)">(≥ 0%)</span></td>`;
+      cols.forEach(c => { thtml += cell(posOf(c.list), c.list.length, 'var(--navy)'); });
+      thtml += `</tr>`;
+      thtml += `<tr class="row-total"><td><strong>Total da coluna</strong></td>
+        ${cols.map(c => `<td class="num"><div style="font-weight:800;font-size:14px">${c.list.length}</div><div style="font-size:10px;color:var(--muted)">100%</div></td>`).join('')}
+      </tr></tbody>`;
+    }
+
+    thtml += `</table></div>`;
+
+    thtml += `<div style="margin-top:8px;font-size:10px;color:var(--muted);line-height:1.5">
+      📐 <strong>Base do %:</strong> faixas positivas (0,1–5% a ≥13,4%) sobre o <strong>TT Positivos</strong> da coluna — somam 100% entre si, como na planilha oficial. <strong>TT Positivos</strong> e <strong>Negativos</strong> sobre o total geral da coluna.
+    </div>`;
+
+    const semPct = setores.length - setoresFx.length;
+    if (semPct > 0) {
+      thtml += `<div style="margin-top:8px;font-size:10px;color:var(--muted)">ℹ️ ${semPct} setor(es) sem dado de % no mês (fora da contagem).</div>`;
+    }
+
+    container.innerHTML = thtml;
+    return; // render direto, pula tabela genérica
 
   } else {
     // fallback (should not reach)
