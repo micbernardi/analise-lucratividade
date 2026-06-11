@@ -2906,7 +2906,11 @@ function momLadder(o){
     const col=v>=0?'var(--green)':'var(--red)';
     bars+=`<text x="2" y="${y+rowH-2}" font-size="7.5" font-weight="700" fill="var(--muted2)">${lbl}</text>`;
     bars+=`<rect x="${x.toFixed(1)}" y="${y}" width="${w.toFixed(1)}" height="${rowH-2}" rx="1.5" fill="${col}" opacity="${i===0?1:(i===1?.7:.45)}"/>`;
-    bars+=`<text x="${(v>=0?x+w+2:x-2).toFixed(1)}" y="${y+rowH-3}" font-size="7" font-weight="700" fill="${col}" text-anchor="${v>=0?'start':'end'}">${tPP(v)}</text>`;
+    // Valor sempre no lado VAZIO do eixo (oposto à barra): nunca sobrepõe o
+    // rótulo TRI/YTD/MAT (negativos) nem corta na borda direita (positivos).
+    const tx = v>=0 ? cx-3 : cx+3;
+    const ta = v>=0 ? 'end' : 'start';
+    bars+=`<text x="${tx.toFixed(1)}" y="${y+rowH-3}" font-size="7" font-weight="700" fill="${col}" text-anchor="${ta}">${tPP(v)}</text>`;
   });
   return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
     <line x1="${cx}" y1="${pad-1}" x2="${cx}" y2="${pad+3*(rowH+gap)-gap}" stroke="var(--border2)" stroke-width="1"/>
