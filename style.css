@@ -235,6 +235,22 @@ input[type=text] {
   color: var(--blue)
 }
 
+/* ── Botão especial: "Faixas de Luc%" se destaca dos demais agrupamentos ── */
+#mg-faixas {
+  background: linear-gradient(180deg, rgba(184, 59, 12, .12), rgba(184, 59, 12, .04));
+  border-color: var(--orange);
+  color: var(--orange);
+  font-weight: 800;
+  letter-spacing: .01em;
+}
+#mg-faixas:hover { color: var(--orange); filter: brightness(.96); }
+#mg-faixas.t-all {
+  background: var(--orange);
+  border-color: var(--orange);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(184, 59, 12, .35);
+}
+
 .ctab.t-s {
   background: var(--gs);
   border-color: var(--green);
