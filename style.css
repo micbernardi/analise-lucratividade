@@ -2517,6 +2517,21 @@ thead tr:not(.thead-groups) th {
   border-top-color: rgba(21, 128, 61, .1)
 }
 /* ── MÉDIAS MODAL ──────────────────────────────────────────────────────────── */
+/* Visão Faixas de Luc%: modal se ajusta à largura do conteúdo e o painel
+   interno perde o limite de altura — tabela inteira visível, sem rolagem. */
+.legend-modal.medias-modal-fx {
+  width: 96vw !important;
+  max-width: 96vw !important;
+  min-width: 0 !important;
+  max-height: 94vh !important;
+  padding: 24px 30px;
+}
+/* Tabela de faixas ocupa toda a largura disponível do modal ampliado */
+.legend-modal.medias-modal-fx .medias-table.medias-faixas { width: 100%; table-layout: auto; }
+#medias-content.medias-content-fx {
+  max-height: none !important;
+  overflow-y: visible !important;
+}
 .medias-table {
   width: 100%;
   border-collapse: collapse;
@@ -2566,9 +2581,170 @@ thead tr:not(.thead-groups) th {
 .medias-fx-badge.fx-prime    { background: #c7d2fe; color: #1e1b4b; }
 .medias-fx-badge.fx-infinity { background: #fde68a; color: #4a2e05; }
 .medias-table.medias-faixas thead th { vertical-align: bottom; }
+/* Compactação da visão Faixas: linhas mais baixas e colunas mais estreitas
+   para que Por Linha / Por Regional / Linha × Regional caibam sem rolagem */
+.medias-table.medias-faixas { font-size: 12px; }
+.medias-table.medias-faixas thead th {
+  padding: 8px 6px;
+  white-space: normal;     /* nomes longos de regionais quebram em 2 linhas */
+  line-height: 1.25;
+}
+.medias-table.medias-faixas td { padding: 5px 4px; }
+/* Rótulo da linha: faixa colorida à esquerda + marcador, em uma linha só */
+.medias-table.medias-faixas td.fx-lbl {
+  text-align: left;
+  white-space: nowrap;
+  padding-left: 12px;
+  padding-right: 10px;
+  font-size: 13px;
+}
+.medias-table.medias-faixas td.fx-lbl strong { font-weight: 800; }
+.fx-lbl-dot {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border-radius: 4px;
+  margin-right: 9px;
+  vertical-align: -2px;
+}
 .medias-table.medias-faixas thead tr.fx-grp-top th { border-bottom: 1px solid var(--navy-light); }
-.medias-table.medias-faixas thead tr.fx-grp-sub th { padding-top: 6px; padding-bottom: 8px; font-size: 9px; }
+.medias-table.medias-faixas thead tr.fx-grp-sub th { padding-top: 4px; padding-bottom: 6px; font-size: 9px; }
 .medias-table.medias-faixas .fx-reg-sep { border-left: 2px solid var(--border); }
+
+/* ── Bandas verticais por regional: no CABEÇALHO marcam o bloco de cada regional. ──
+   No corpo, a diferenciação passou a ser por LINHA (tom horizontal), então o fundo
+   vertical do corpo é desligado para não conflitar. ── */
+.medias-table.medias-faixas thead .fx-band-b { background: rgba(255, 255, 255, .07); }
+/* Separador entre REGIONAIS mais forte que o de PRIME→INFINITY (que não tem) */
+.medias-table.medias-faixas tbody .fx-reg-sep { border-left: 2px solid var(--border2); }
+.medias-table.medias-faixas thead .fx-reg-sep { border-left: 2px solid var(--navy-light); }
+/* Nome da regional no topo: faixa de destaque para ler como "bloco" */
+.medias-table.medias-faixas thead th.fx-reg-name {
+  font-size: 11px;
+  border-bottom: 2px solid var(--navy-light);
+}
+/* Coluna Geral: cabeçalho levemente destacado como coluna-resumo (corpo segue o tom da linha) */
+.medias-table.medias-faixas thead th.fx-geral { background: rgba(255, 255, 255, .1); }
+.medias-table.medias-faixas thead th.fx-reg-sep.fx-geral,
+.medias-table.medias-faixas tbody td.fx-reg-sep.fx-geral { border-left: 3px solid var(--navy-light); }
+/* Realce ao passar o mouse: acende a regional inteira */
+.medias-table.medias-faixas .fx-hot { background: var(--os) !important; }
+.medias-table.medias-faixas thead th.fx-hot { background: rgba(184, 59, 12, .35) !important; }
+
+/* ── Diferenciação HORIZONTAL: cada linha recebe um tom suave da sua cor (--rt), ──
+   ── definido na <tr>; o rótulo à esquerda fica um pouco mais forte. ── */
+.medias-table.medias-faixas tbody td { background: rgba(var(--rt, 30,58,95), .07); }
+.medias-table.medias-faixas tbody td.fx-lbl { background: rgba(var(--rt, 30,58,95), .16); }
+.medias-table.medias-faixas tbody tr.row-total td { background: rgba(var(--rt, 30,58,95), .11); }
+.medias-table.medias-faixas tbody tr:hover td { background: rgba(var(--rt, 30,58,95), .14); }
+/* ── Destaque de regional (clique no cabeçalho) ── */
+.medias-table.medias-faixas th.fx-clickable { cursor: pointer; transition: background .12s; }
+.medias-table.medias-faixas th.fx-clickable:hover { background: var(--navy-light); }
+/* Coluna selecionada: marcação discreta na tabela (o destaque real é o spotlight) */
+.medias-table.medias-faixas thead th.fx-sel {
+  box-shadow: inset 0 -3px 0 var(--orange);
+}
+.medias-table.medias-faixas td.fx-sel { background: var(--os); }
+.medias-table.medias-faixas tbody tr:hover td.fx-sel { background: var(--om); }
+
+/* ── Spotlight: regional clicada vem para a frente, ampliada ── */
+.fx-spotlight-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(10, 15, 28, .5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(8px, 1.5vh, 24px);
+  animation: fxslfade .15s ease;
+}
+@keyframes fxslfade { from { opacity: 0 } to { opacity: 1 } }
+.fx-spotlight {
+  position: relative;
+  background: #fff;
+  border-radius: 16px;
+  padding: clamp(14px, 2.2vh, 24px) 28px clamp(10px, 1.6vh, 18px);
+  width: min(900px, 94vw);
+  max-height: 96vh;
+  overflow-y: auto;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, .4);
+  border-top: 5px solid var(--orange);
+  animation: fxslpop .2s cubic-bezier(.2, .8, .3, 1.25);
+}
+@keyframes fxslpop {
+  from { transform: scale(.88); opacity: 0 }
+  to   { transform: scale(1);   opacity: 1 }
+}
+.fx-sl-close {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  border: none;
+  background: var(--surface2);
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.fx-sl-close:hover { background: var(--red); color: #fff; }
+.fx-sl-title { font-size: clamp(16px, 2.6vh, 22px); font-weight: 800; color: var(--text); padding-right: 40px; line-height: 1.15; }
+.fx-sl-sub {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  font-weight: 700;
+  margin-bottom: clamp(6px, 1.4vh, 16px);
+}
+.fx-sl-table { display: flex; flex-direction: column; }
+.fx-sl-row {
+  display: grid;
+  grid-template-columns: 170px repeat(var(--sl-cols, 3), 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: clamp(3px, .75vh, 8px) 4px;
+  border-bottom: 1px solid var(--border);
+}
+.fx-sl-head-row { border-bottom: 2px solid var(--navy-light); padding-bottom: clamp(4px, .9vh, 9px); }
+.fx-sl-col-h { text-align: center; }
+.fx-sl-coln { font-size: 9px; color: var(--muted); margin-top: 2px; }
+.fx-sl-lab {
+  font-size: clamp(11px, 1.6vh, 13px);
+  font-weight: 700;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fx-sl-lab small { font-weight: 400; color: var(--muted); }
+.fx-sl-dot { width: 11px; height: 11px; border-radius: 3px; flex: none; }
+.fx-sl-cell { text-align: center; }
+.fx-sl-pct { font-size: clamp(15px, 2.5vh, 24px); font-weight: 800; line-height: 1.1; color: var(--text); }
+.fx-sl-n { font-size: clamp(9px, 1.2vh, 10px); color: var(--muted); }
+.fx-sl-bar {
+  height: 5px;
+  border-radius: 3px;
+  background: var(--surface2);
+  margin: clamp(2px, .5vh, 5px) auto 0;
+  max-width: 100px;
+  overflow: hidden;
+}
+.fx-sl-bar > div { height: 100%; border-radius: 3px; }
+.fx-sl-tt { background: var(--surface); border-radius: 7px; }
+.fx-sl-tt .fx-sl-pct { font-size: clamp(14px, 2.2vh, 21px); }
+.fx-sl-total {
+  border-bottom: none;
+  border-top: 2px solid var(--navy-light);
+  margin-top: 2px;
+}
+.fx-sl-total .fx-sl-pct { font-size: clamp(13px, 2vh, 19px); }
+.fx-sl-foot { margin-top: clamp(7px, 1.3vh, 14px); font-size: 10px; color: var(--muted); line-height: 1.5; }
+.medias-fx-badge.fx-total { background: var(--navy); color: #fff; }
 .medias-table td:first-child { text-align: left; }
 .medias-table td.num {
   text-align: center;

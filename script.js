@@ -1867,6 +1867,57 @@ function closeLegendIfBg(e) {
 let mediasGrupo = 'linha';
 let mediasViewM = null;
 let mediasFaixaDim = 'linha'; // 'linha' | 'regional' — dimensão das colunas na visão Faixas
+let mediasFaixaRegSel = '';   // código da regional em destaque na visão Faixas ('' = nenhuma)
+
+// Abrevia o 2º nome para inicial — encurta os nomes longos das regionais nos cabeçalhos.
+// Ex.: "BRUNO DA SILVA BITTENCOURT" → "BRUNO S. BITTENCOURT"; "JULIO CESAR AVER" → "JULIO C. AVER".
+// Partículas (da/de/do/...) antes do 2º nome são ignoradas; o restante do nome é mantido.
+function abreviaRegional(nome) {
+  if (!nome) return nome;
+  const parts = String(nome).trim().split(/\s+/);
+  if (parts.length <= 2) return String(nome); // nome já curto: mantém
+  const particulas = new Set(['da', 'de', 'do', 'das', 'dos', 'e', 'di', 'du', 'del']);
+  const out = [parts[0]];
+  let abreviado = false;
+  for (let i = 1; i < parts.length; i++) {
+    const w = parts[i];
+    if (!abreviado) {
+      if (particulas.has(w.toLowerCase())) continue; // pula partícula antes do 2º nome
+      out.push(w.charAt(0).toUpperCase() + '.');     // 2º nome → inicial
+      abreviado = true;
+    } else {
+      out.push(w); // mantém sobrenomes seguintes
+    }
+  }
+  return out.join(' ');
+}
+
+function fxToggleReg(code) {
+  mediasFaixaRegSel = (mediasFaixaRegSel === code) ? '' : String(code);
+  renderMedias();
+}
+
+// Realce de regional inteira ao passar o mouse: acende todas as colunas (PRIME/INFINITY)
+// daquela regional. Delegação ligada uma única vez no container.
+function fxBindRegHover(container) {
+  if (!container || container._fxHoverBound) return;
+  container._fxHoverBound = true;
+  let cur = null;
+  const paint = (code, on) => {
+    container.querySelectorAll('[data-reg="' + code + '"]').forEach(el => el.classList.toggle('fx-hot', on));
+  };
+  container.addEventListener('mouseover', e => {
+    const cell = e.target.closest && e.target.closest('[data-reg]');
+    const code = cell ? cell.getAttribute('data-reg') : null;
+    if (code === cur) return;
+    if (cur != null) paint(cur, false);
+    cur = code;
+    if (cur != null) paint(cur, true);
+  });
+  container.addEventListener('mouseleave', () => {
+    if (cur != null) { paint(cur, false); cur = null; }
+  });
+}
 
 function openMedias() {
   if (!SETORES.length) return;
@@ -1917,6 +1968,12 @@ function setMediasGrupo(g, btn) {
 function renderMedias() {
   const m = mediasViewM || lucViewM;
   const container = document.getElementById('medias-content');
+
+  // ── Visão Faixas: modal se ajusta ao conteúdo (sem scroll interno) ──
+  const isFx = mediasGrupo === 'faixas';
+  const modalEl = container.closest('.legend-modal');
+  if (modalEl) modalEl.classList.toggle('medias-modal-fx', isFx);
+  container.classList.toggle('medias-content-fx', isFx);
   if (!SETORES.length) { container.innerHTML = '<p style="color:var(--muted);text-align:center;padding:24px">Sem dados carregados.</p>'; return; }
 
   const setores = SETORES.filter(s => s['luc_' + m] != null || s['lucro_' + m] != null);
@@ -2199,26 +2256,115 @@ function renderMedias() {
       : l === 'INFINITY' ? '<span class="medias-fx-badge fx-infinity">INFINITY</span>'
       : l;
 
-    // Célula: % grande + (n setores) + mini-barra proporcional
-    const cell = (n, base, color, extraCls = '') => {
-      const p = base > 0 ? n / base * 100 : 0;
-      return `<td class="num ${extraCls}" style="min-width:90px">
-        <div style="font-weight:800;font-size:14px">${fmtPct(n, base)}</div>
-        <div style="font-size:10px;color:var(--muted)">${n} setor${n === 1 ? '' : 'es'}</div>
-        <div style="height:4px;border-radius:2px;background:var(--surface2);margin-top:3px;overflow:hidden">
-          <div style="height:100%;width:${p.toFixed(1)}%;background:${color};border-radius:2px"></div>
-        </div>
+    // Célula: % grande + (n setores) + mini-barra proporcional (compacta p/ caber sem scroll)
+    const cell = (n, base, color, extraCls = '', attrs = '') => {
+      return `<td class="num ${extraCls}" style="min-width:58px"${attrs}>
+        <div style="font-weight:800;font-size:16px;line-height:1.15">${fmtPct(n, base)}</div>
+        <div style="font-size:12px;color:var(--muted);font-weight:600;line-height:1.25;white-space:nowrap">${n} setores</div>
       </td>`;
     };
+
+    // Célula de rótulo da linha, com faixa colorida à esquerda (identifica a linha facilmente)
+    const lblTd = (labelHtml, color) => {
+      const c = color || 'var(--navy)';
+      return `<td class="fx-lbl" style="border-left:6px solid ${c}"><span class="fx-lbl-dot" style="background:${c}"></span>${labelHtml}</td>`;
+    };
+
+    // Tom (R,G,B) de cada cor de faixa → usado para tingir a linha inteira e diferenciá-la
+    const tripFor = c => ({
+      'var(--green)':  '26,107,63',
+      'var(--blue)':   '45,59,140',
+      'var(--yellow)': '161,98,7',
+      'var(--muted)':  '123,132,153',
+      'var(--red)':    '168,28,28',
+      'var(--navy)':   '30,58,95',
+    }[c] || '30,58,95');
+    // Abre a <tr> já com o tom da linha (--rt) para a faixa de cor horizontal
+    const trOpen = (accent, isTotal) =>
+      `<tr class="${isTotal ? 'row-total' : ''}" style="--rt:${tripFor(accent)}">`;
+
+    // ── Destaque de regional (clique no cabeçalho) ──
+    // Em vez de escurecer as demais colunas, só marca discretamente a coluna
+    // selecionada na tabela — o destaque "de verdade" é o card ampliado (spotlight).
+    const regSel = mediasFaixaRegSel;
+    const regCls = code => (regSel && String(code) === regSel) ? ' fx-sel' : '';
 
     // ── Sub-toggle de dimensão das colunas ──
     const dimBtn = (val, lbl) => `
       <button class="ctab${mediasFaixaDim === val ? ' t-all' : ''}" style="font-size:11px;padding:4px 10px"
         onclick="mediasFaixaDim='${val}';renderMedias()">${lbl}</button>`;
 
+    const regSelNome = (() => {
+      if (!regSel) return '';
+      const o = setoresFx.find(o => String(o.s.regional) === regSel);
+      return o ? (o.s.regional_nome || o.s.regional) : regSel;
+    })();
+    const hint = (mediasFaixaDim === 'linha') ? '' : (regSel
+      ? `<span style="font-size:10px;color:var(--orange);font-weight:700">★ ${regSelNome} em destaque — <a href="javascript:void(0)" onclick="fxToggleReg('${regSel}')" style="color:var(--orange)">limpar</a></span>`
+      : `<span style="font-size:10px;color:var(--muted)">💡 Clique no nome de uma regional para abri-la ampliada em destaque</span>`);
+
+    // ── Card ampliado (spotlight): regional clicada vem para a frente, maior ──
+    const buildSpotlight = () => {
+      if (!regSel || mediasFaixaDim === 'linha') return '';
+      const all = setoresFx.filter(o => String(o.s.regional) === regSel);
+      if (!all.length) return '';
+      const prime = all.filter(o => (o.s.linha || '') === 'PRIME');
+      const inf   = all.filter(o => (o.s.linha || '') === 'INFINITY');
+      const slCols = [
+        { label: 'PRIME',    badge: 'fx-prime',    list: prime },
+        { label: 'INFINITY', badge: 'fx-infinity', list: inf },
+        { label: 'TOTAL',    badge: 'fx-total',    list: all },
+      ].filter(c => c.label === 'TOTAL' || c.list.length);
+
+      const bigCell = (n, base, color) => {
+        const p = base > 0 ? n / base * 100 : 0;
+        return `<div class="fx-sl-cell">
+          <div class="fx-sl-pct">${fmtPct(n, base)}</div>
+          <div class="fx-sl-n">${n} setor${n === 1 ? '' : 'es'}</div>
+          <div class="fx-sl-bar"><div style="width:${p.toFixed(1)}%;background:${color}"></div></div>
+        </div>`;
+      };
+
+      let head = `<div class="fx-sl-row fx-sl-head-row"><div class="fx-sl-lab"></div>`;
+      slCols.forEach(c => {
+        head += `<div class="fx-sl-col-h"><span class="medias-fx-badge ${c.badge}">${c.label}</span><div class="fx-sl-coln">${c.list.length} setores</div></div>`;
+      });
+      head += `</div>`;
+
+      let body = '';
+      fxRows.forEach(r => {
+        body += `<div class="fx-sl-row"><div class="fx-sl-lab"><span class="fx-sl-dot" style="background:${r.color}"></span>${r.label}</div>`;
+        slCols.forEach(c => {
+          const base = r.fx === 'neg' ? c.list.length : posOf(c.list);
+          body += bigCell(countFx(c.list, r.fx), base, r.color);
+        });
+        body += `</div>`;
+      });
+      body += `<div class="fx-sl-row fx-sl-tt"><div class="fx-sl-lab">TT Positivos <small>(≥ 0%)</small></div>`;
+      slCols.forEach(c => { body += bigCell(posOf(c.list), c.list.length, 'var(--green)'); });
+      body += `</div>`;
+      body += `<div class="fx-sl-row fx-sl-tt"><div class="fx-sl-lab">TT Negativos <small>(&lt; 0%)</small></div>`;
+      slCols.forEach(c => { body += bigCell(countFx(c.list, 'neg'), c.list.length, 'var(--red)'); });
+      body += `</div>`;
+      body += `<div class="fx-sl-row fx-sl-total"><div class="fx-sl-lab">Total da coluna</div>`;
+      slCols.forEach(c => { body += `<div class="fx-sl-cell"><div class="fx-sl-pct">${c.list.length}</div><div class="fx-sl-n">100%</div></div>`; });
+      body += `</div>`;
+
+      return `<div class="fx-spotlight-backdrop" onclick="fxToggleReg('${regSel}')">
+        <div class="fx-spotlight" style="--sl-cols:${slCols.length}" onclick="event.stopPropagation()">
+          <button class="fx-sl-close" onclick="fxToggleReg('${regSel}')" title="Fechar">✕</button>
+          <div class="fx-sl-title">${regSelNome}</div>
+          <div class="fx-sl-sub">Faixas de Lucratividade · YTD ${m}</div>
+          <div class="fx-sl-table">${head}${body}</div>
+          <div class="fx-sl-foot">% das faixas positivas é sobre o <strong>TT Positivos</strong> da coluna; <strong>TT Positivos</strong> e <strong>TT Negativos</strong> sobre o total geral da coluna.</div>
+        </div>
+      </div>`;
+    };
+
     const toolbar = `
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
         <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">${title} — YTD ${m}</div>
+        ${hint}
         <div style="display:flex;gap:6px;margin-left:auto;align-items:center;flex-wrap:wrap">
           <span style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em">Colunas:</span>
           ${dimBtn('linha', 'Por Linha')}
@@ -2227,7 +2373,7 @@ function renderMedias() {
         </div>
       </div>`;
 
-    const tip = `Faixa = Lucro ÷ Venda Líquida (YTD ${m}), mesma régua da view Lucratividade. % das faixas positivas é sobre o TT Positivos da coluna (igual à planilha oficial); TT Positivos e Negativos são sobre o total geral da coluna.`;
+    const tip = `Faixa = Lucro ÷ Venda Líquida (YTD ${m}), mesma régua da view Lucratividade. % das faixas positivas é sobre o total de setores positivos da coluna (igual à planilha oficial); a faixa Negativos é sobre o total geral da coluna.`;
 
     let thtml = toolbar + `<div style="overflow-x:auto"><table class="medias-table medias-faixas">`;
 
@@ -2242,6 +2388,13 @@ function renderMedias() {
       setoresFx.forEach(o => { if (!regMap[o.s.regional]) regMap[o.s.regional] = o.s.regional_nome || o.s.regional; });
       const regs = Object.entries(regMap).sort((a, b) => a[1].localeCompare(b[1]));
 
+      // ── Bandas verticais: cada regional ganha um tom alternado + data-reg ──
+      // (facilita enxergar a qual regional cada coluna pertence ao descer as linhas)
+      const regIdx = {};
+      regs.forEach(([code], i) => { regIdx[code] = i; });
+      const bandCls = code => (regIdx[code] % 2 === 1) ? ' fx-band-b' : ' fx-band-a';
+      const dReg    = code => ` data-reg="${code}"`;
+
       const grupo = {}; // regional|linha → list
       setoresFx.forEach(o => {
         const k = o.s.regional + '|' + (o.s.linha || '—');
@@ -2252,51 +2405,49 @@ function renderMedias() {
       // Cabeçalho duplo
       thtml += `<thead>
         <tr class="fx-grp-top">
-          <th rowspan="2" style="min-width:170px;text-align:left">Faixa de Luc% <span style="font-weight:400;text-transform:none;font-size:9px" title="${tip}">YTD ${m} ⓘ</span></th>`;
+          <th rowspan="2" class="fx-corner" style="min-width:148px;text-align:left">Faixa de Luc% <span style="font-weight:400;text-transform:none;font-size:9px" title="${tip}">YTD ${m} ⓘ</span></th>`;
       regs.forEach(([code, nome]) => {
-        thtml += `<th class="num fx-reg-sep" colspan="${linhas.length}">${nome}</th>`;
+        thtml += `<th class="num fx-reg-sep fx-reg-name fx-clickable${bandCls(code)}${regCls(code)}" colspan="${linhas.length}"${dReg(code)} onclick="fxToggleReg('${code}')" title="${nome} — clique para destacar">${abreviaRegional(nome)}</th>`;
       });
-      thtml += `<th class="num fx-reg-sep" rowspan="2" style="min-width:90px">${hdrBadge('')}<div>Geral</div><div style="font-weight:400;font-size:9px;text-transform:none;opacity:.8">${setoresFx.length} set.</div></th>`;
+      thtml += `<th class="num fx-reg-sep fx-geral" rowspan="2" style="min-width:64px">${hdrBadge('')}<div>Geral</div><div style="font-weight:400;font-size:9px;text-transform:none;opacity:.8;white-space:nowrap">${setoresFx.length} setores</div></th>`;
       thtml += `</tr><tr class="fx-grp-sub">`;
       regs.forEach(([code]) => {
         linhas.forEach((l, i) => {
-          thtml += `<th class="num${i === 0 ? ' fx-reg-sep' : ''}">${hdrBadge(l)}<div style="font-weight:400;font-size:9px;text-transform:none;opacity:.8">${listOf(code, l).length} set.</div></th>`;
+          thtml += `<th class="num${i === 0 ? ' fx-reg-sep' : ''}${bandCls(code)}${regCls(code)}"${dReg(code)}>${hdrBadge(l)}<div style="font-weight:400;font-size:9px;text-transform:none;opacity:.8;white-space:nowrap">${listOf(code, l).length} setores</div></th>`;
         });
       });
       thtml += `</tr></thead><tbody>`;
 
-      const renderDataRow = (labelHtml, dotColor, pickN, baseFn, isTotal) => {
-        thtml += `<tr class="${isTotal ? 'row-total' : ''}">
-          <td style="white-space:nowrap">${dotColor ? `<span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${dotColor};margin-right:7px;vertical-align:-1px"></span>` : ''}<strong>${labelHtml}</strong></td>`;
+      const renderDataRow = (labelHtml, accent, pickN, baseFn, isTotal) => {
+        thtml += trOpen(accent, isTotal) + lblTd(labelHtml, accent);
         regs.forEach(([code]) => {
           linhas.forEach((l, i) => {
             const list = listOf(code, l);
-            thtml += cell(pickN(list), baseFn(list), dotColor || 'var(--navy)', i === 0 ? 'fx-reg-sep' : '');
+            thtml += cell(pickN(list), baseFn(list), accent, (i === 0 ? 'fx-reg-sep' : '') + bandCls(code) + regCls(code), dReg(code));
           });
         });
-        thtml += cell(pickN(setoresFx), baseFn(setoresFx), dotColor || 'var(--navy)', 'fx-reg-sep');
+        thtml += cell(pickN(setoresFx), baseFn(setoresFx), accent, 'fx-reg-sep fx-geral');
         thtml += `</tr>`;
       };
 
       // Faixas positivas: base = TT Positivos da coluna (igual planilha oficial).
       // Negativos: base = total geral da coluna.
       fxRows.forEach(r => renderDataRow(
-        r.label, r.color,
+        `<strong>${r.label}</strong>`, r.color,
         list => countFx(list, r.fx),
         r.fx === 'neg' ? (list => list.length) : posOf,
         false
       ));
-      renderDataRow('TT Positivos <span style="font-size:10px;color:var(--muted);font-weight:400">(≥ 0%)</span>', null, posOf, list => list.length, true);
 
       // Total da coluna
-      thtml += `<tr class="row-total"><td><strong>Total da coluna</strong></td>`;
+      thtml += trOpen('var(--navy)', true) + lblTd('<strong>Total da coluna</strong>', 'var(--navy)');
       regs.forEach(([code]) => {
         linhas.forEach((l, i) => {
           const n = listOf(code, l).length;
-          thtml += `<td class="num${i === 0 ? ' fx-reg-sep' : ''}"><div style="font-weight:800;font-size:14px">${n}</div><div style="font-size:10px;color:var(--muted)">100%</div></td>`;
+          thtml += `<td class="num${i === 0 ? ' fx-reg-sep' : ''}${bandCls(code)}${regCls(code)}"${dReg(code)}><div style="font-weight:800;font-size:15px">${n}</div><div style="font-size:9px;color:var(--muted)">100%</div></td>`;
         });
       });
-      thtml += `<td class="num fx-reg-sep"><div style="font-weight:800;font-size:14px">${setoresFx.length}</div><div style="font-size:10px;color:var(--muted)">100%</div></td></tr>`;
+      thtml += `<td class="num fx-reg-sep fx-geral"><div style="font-weight:800;font-size:15px">${setoresFx.length}</div><div style="font-size:9px;color:var(--muted)">100%</div></td></tr>`;
       thtml += `</tbody>`;
 
     } else {
@@ -2312,42 +2463,42 @@ function renderMedias() {
         const grupos = {};
         setoresFx.forEach(o => {
           const k = o.s.regional;
-          if (!grupos[k]) grupos[k] = { nome: o.s.regional_nome || o.s.regional, list: [] };
+          if (!grupos[k]) grupos[k] = { code: k, nome: o.s.regional_nome || o.s.regional, list: [] };
           grupos[k].list.push(o);
         });
         cols = Object.values(grupos).sort((a, b) => a.nome.localeCompare(b.nome))
-          .map(g => ({ key: g.nome, label: `<strong>${g.nome}</strong>`, list: g.list }));
+          .map(g => ({ key: g.nome, code: g.code, full: g.nome, label: `<strong>${abreviaRegional(g.nome)}</strong>`, list: g.list }));
       }
-      cols.push({ key: '__total__', label: '<strong>Geral</strong>', list: setoresFx });
+      cols.push({ key: '__total__', code: null, full: 'Geral', label: '<strong>Geral</strong>', list: setoresFx });
+
+      // Classe de destaque por coluna (só colunas com código de regional participam)
+      const colCls = c => (c.code != null && mediasFaixaDim === 'regional') ? regCls(c.code) : '';
 
       thtml += `<thead><tr>
-          <th style="min-width:170px;text-align:left">Faixa de Luc% <span style="font-weight:400;text-transform:none;font-size:9px" title="${tip}">YTD ${m} ⓘ</span></th>
-          ${cols.map(c => `<th class="num" style="white-space:nowrap">${c.label}<div style="font-weight:400;font-size:9px;text-transform:none;opacity:.8">${c.list.length} setores</div></th>`).join('')}
+          <th style="min-width:148px;text-align:left">Faixa de Luc% <span style="font-weight:400;text-transform:none;font-size:9px" title="${tip}">YTD ${m} ⓘ</span></th>
+          ${cols.map(c => `<th class="num${c.code != null && mediasFaixaDim === 'regional' ? ' fx-clickable' : ''}${colCls(c)}" style="max-width:120px"${c.code != null && mediasFaixaDim === 'regional' ? ` onclick="fxToggleReg('${c.code}')" title="${c.full} — clique para destacar"` : ''}>${c.label}<div style="font-weight:400;font-size:10px;text-transform:none;opacity:.8;white-space:nowrap">${c.list.length} setores</div></th>`).join('')}
         </tr></thead><tbody>`;
 
       // Faixas positivas: base = TT Positivos da coluna (igual planilha oficial).
       // Negativos: base = total geral da coluna.
       fxRows.forEach(r => {
-        thtml += `<tr><td style="white-space:nowrap"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${r.color};margin-right:7px;vertical-align:-1px"></span><strong>${r.label}</strong></td>`;
+        thtml += trOpen(r.color, false) + lblTd(`<strong>${r.label}</strong>`, r.color);
         cols.forEach(c => {
           const base = r.fx === 'neg' ? c.list.length : posOf(c.list);
-          thtml += cell(countFx(c.list, r.fx), base, r.color);
+          thtml += cell(countFx(c.list, r.fx), base, r.color, colCls(c));
         });
         thtml += `</tr>`;
       });
 
-      thtml += `<tr class="row-total"><td><strong>TT Positivos</strong> <span style="font-size:10px;color:var(--muted)">(≥ 0%)</span></td>`;
-      cols.forEach(c => { thtml += cell(posOf(c.list), c.list.length, 'var(--navy)'); });
-      thtml += `</tr>`;
-      thtml += `<tr class="row-total"><td><strong>Total da coluna</strong></td>
-        ${cols.map(c => `<td class="num"><div style="font-weight:800;font-size:14px">${c.list.length}</div><div style="font-size:10px;color:var(--muted)">100%</div></td>`).join('')}
+      thtml += trOpen('var(--navy)', true) + lblTd('<strong>Total da coluna</strong>', 'var(--navy)') + `
+        ${cols.map(c => `<td class="num${colCls(c)}"><div style="font-weight:800;font-size:15px">${c.list.length}</div><div style="font-size:9px;color:var(--muted)">100%</div></td>`).join('')}
       </tr></tbody>`;
     }
 
     thtml += `</table></div>`;
 
     thtml += `<div style="margin-top:8px;font-size:10px;color:var(--muted);line-height:1.5">
-      📐 <strong>Base do %:</strong> faixas positivas (0,1–5% a ≥13,4%) sobre o <strong>TT Positivos</strong> da coluna — somam 100% entre si, como na planilha oficial. <strong>TT Positivos</strong> e <strong>Negativos</strong> sobre o total geral da coluna.
+      📐 <strong>Base do %:</strong> cada faixa positiva (0,1–5% a ≥13,4%) é calculada sobre o total de setores <strong>positivos</strong> da coluna — as positivas somam 100% entre si, como na planilha oficial. A faixa <strong>Negativos</strong> é sobre o total geral da coluna.
     </div>`;
 
     const semPct = setores.length - setoresFx.length;
@@ -2355,7 +2506,10 @@ function renderMedias() {
       thtml += `<div style="margin-top:8px;font-size:10px;color:var(--muted)">ℹ️ ${semPct} setor(es) sem dado de % no mês (fora da contagem).</div>`;
     }
 
+    thtml += buildSpotlight();
+
     container.innerHTML = thtml;
+    fxBindRegHover(container); // realce da regional inteira ao passar o mouse
     return; // render direto, pula tabela genérica
 
   } else {
