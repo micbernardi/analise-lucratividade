@@ -55,6 +55,70 @@ document.addEventListener('click', () => {
 let pendingLuc = []; // File objects
 let pendingDesemp = []; // File objects (one per month)
 
+// ═══════════════════════════════════════════════════════════════════════════
+// PERSISTÊNCIA DE FILTROS — apenas Regional + Distrital, compartilhados
+// entre as três visões (Geral, Lucratividade, Tendência) e entre sessões.
+// Marcou uma Regional/Distrital numa visão → vale para todas.
+// ═══════════════════════════════════════════════════════════════════════════
+const FILTERS_KEY = 'supera_filters';
+let _persistReady = false;            // só salva depois do load inicial
+let sharedReg = '', sharedDist = '';  // seleção global de Regional/Distrital
+
+// IDs de Regional/Distrital de cada visão
+const REGDIST_IDS = {
+  geral: { reg: 'f-reg',  dist: 'f-dist'  },
+  luc:   { reg: 'lf-reg', dist: 'lf-dist' },
+  tend:  { reg: 'tf-reg', dist: 'tf-dist' },
+};
+
+// Popula um <select> de distrital conforme a regional escolhida
+function _fillDistInto(selId, regVal){
+  const fd = document.getElementById(selId);
+  if (!fd) return;
+  fd.innerHTML = '<option value="">Todas</option>';
+  const seen = new Set();
+  SETORES.forEach(s => {
+    if (regVal && s.regional !== regVal) return;
+    if (seen.has(s.distrital)) return;
+    seen.add(s.distrital);
+    const o = document.createElement('option');
+    o.value = s.distrital; o.textContent = s.distrital_nome || s.distrital;
+    fd.appendChild(o);
+  });
+}
+
+// Aplica a seleção compartilhada nos selects de uma visão
+function applyRegDistTo(regId, distId){
+  const r = document.getElementById(regId);
+  if (r) r.value = sharedReg;
+  _fillDistInto(distId, sharedReg);
+  const d = document.getElementById(distId);
+  if (d) d.value = sharedDist;
+}
+
+// Lê Regional/Distrital da visão ATIVA para a seleção compartilhada
+function captureRegDist(){
+  const ids = REGDIST_IDS[currentView] || REGDIST_IDS.geral;
+  const re = document.getElementById(ids.reg);
+  const de = document.getElementById(ids.dist);
+  if (re) sharedReg  = re.value || '';
+  if (de) sharedDist = de.value || '';
+}
+
+function saveFilters(){
+  if (!_persistReady) return;
+  captureRegDist();
+  try { localStorage.setItem(FILTERS_KEY, JSON.stringify({ reg: sharedReg, dist: sharedDist })); }
+  catch(e){}
+}
+
+function loadSavedFilters(){
+  try {
+    const o = JSON.parse(localStorage.getItem(FILTERS_KEY) || 'null');
+    if (o){ sharedReg = o.reg || ''; sharedDist = o.dist || ''; }
+  } catch(e){ sharedReg = ''; sharedDist = ''; }
+}
+
 // ── INIT ──────────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
   // Try to load from localStorage
@@ -141,7 +205,12 @@ function loadDataset(parsed) {
   // Sync month buttons to activeMeses
   syncMonthButtons();
 
-  applyFilters();
+  // ── Restaura apenas Regional/Distrital (compartilhado entre as visões) ──
+  loadSavedFilters();
+  applyRegDistTo('f-reg', 'f-dist');
+
+  setVM(viewM);           // injeta dados do mês e aplica filtros (já com a regional/distrital aplicadas)
+  _persistReady = true;   // a partir daqui, mudanças de Regional/Distrital são salvas
 }
 
 function syncMonthButtons() {
@@ -331,6 +400,7 @@ function applyFilters() {
   updateHdr(base);
   updateKPIs(base);
   renderTable();
+  saveFilters();
 }
 
 function sortBy(col) {
@@ -1401,11 +1471,18 @@ function switchView(v) {
 
   if (v === 'luc') {
     syncLucFilters();
+    applyRegDistTo('lf-reg', 'lf-dist');   // herda Regional/Distrital
     renderLuc();
   } else if (v === 'tend') {
     tendSyncFilters();
+    tendReg = sharedReg; tendDist = sharedDist;  // tend usa variáveis globais
+    applyRegDistTo('tf-reg', 'tf-dist');
     renderTend();
+  } else { // geral
+    applyRegDistTo('f-reg', 'f-dist');
+    applyFilters();
   }
+  saveFilters();
 }
 
 function syncLucFilters() {
@@ -1491,6 +1568,7 @@ function applyLucFocus() {
       cards.forEach(c => body.appendChild(c));
     }
   });
+  saveFilters();
 }
 
 function setLucFilters(neg, virou, virouPos) {
@@ -1713,6 +1791,7 @@ function renderLuc() {
 
   // Re-apply focus if one was active before re-render
   if (lucFocusedCol) applyLucFocus();
+  saveFilters();
 }
 
 // ── EXPORT LUC EXCEL ─────────────────────────────────────────────────────────
@@ -3007,6 +3086,7 @@ function renderTend(){
       </div>
     </div>`;
   }).join('');
+  saveFilters();
 }
 // ── Barra compacta "Faixas de Lucratividade (%)" — filtro + totais ───────────
 function renderTendFaixas(){
