@@ -1,485 +1,610 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SUPERA · Rentabilidade & Desempenho</title>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=Archivo+Narrow:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
-<link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SUPERA · Rentabilidade & Desempenho</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=Archivo+Narrow:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+  <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
 
-<!-- HEADER -->
-<div class="hdr">
-  <div class="brand">
-    <div class="logo-supera">
-      <span class="logo-sup">supera</span>
-      <span class="logo-farm">farma</span>
-    </div>
-    <div class="brand-divider"></div>
-    <div>
-      <h1>Dashboard Rentabilidade & Desempenho</h1>
-      <p>JAN–ABR 2026</p>
-    </div>
-    <div class="view-tabs">
-      <button class="view-tab active" id="vt-geral" onclick="switchView('geral')">📊 Geral</button>
-      <button class="view-tab" id="vt-luc" onclick="switchView('luc')">💰 Lucratividade</button>
-      <button class="view-tab" id="vt-tend" onclick="switchView('tend')">📈 Tendência</button>
-    </div>
-  </div>
-  <div class="hcounts">
-    <div class="hc"><div class="hc-v" id="h-tot" style="color:var(--muted2)">—</div><div class="hc-l">Setores</div></div>
-    <div class="hc"><div class="hc-v" style="color:var(--green)" id="h-s">—</div><div class="hc-l">Saudável</div></div>
-    <div class="hc"><div class="hc-v" style="color:var(--yellow)" id="h-a">—</div><div class="hc-l">Atenção</div></div>
-    <div class="hc"><div class="hc-v" style="color:var(--orange)" id="h-alr">—</div><div class="hc-l">ALERTA</div></div>
-    <div class="hc"><div class="hc-v" style="color:var(--red)" id="h-c">—</div><div class="hc-l">Crítico</div></div>
-    <span id="h-est" style="display:none"></span>
-    <span id="h-rec" style="display:none"></span>
-    <button class="btn-upload btn-export" id="btn-export" onclick="exportExcel()" style="display:none">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3v7M5 7l3 3 3-3M3 12h10"/></svg>
-      Exportar
-    </button>
-    <button class="btn-upload" onclick="openUpload()">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 10V3M5 6l3-3 3 3M3 12h10"/></svg>
-      Planilhas
-    </button>
-  </div>
-</div>
-
-<!-- FILTERS -->
-<div class="fbar">
-  <div class="fbar-row">
-    <div class="fg"><label>Regional</label>
-      <select id="f-reg" onchange="onRegChange()"><option value="">Todas</option></select></div>
-    <div class="fg"><label>Distrital</label>
-      <select id="f-dist" onchange="applyFilters()"><option value="">Todas</option></select></div>
-    <div class="fsep"></div>
-    <div class="fg"><label>Meses neg.</label>
-      <select id="f-neg" onchange="applyFilters()">
-        <option value="">Todos</option><option value="1">≥ 1</option>
-        <option value="2">≥ 2</option><option value="3">≥ 3</option><option value="4">4 meses</option>
-      </select></div>
-    <div class="fg"><label>Share YTD</label>
-      <select id="f-share" onchange="applyFilters()">
-        <option value="">Todos</option>
-        <option value="beat">Ganhou share</option><option value="miss">Perdeu share</option>
-      </select></div>
-    <div class="fsep"></div>
-    <div class="fg"><label>Linha</label>
-      <div class="linha-dd" id="linha-dd" onclick="toggleLinhaDd(event)">
-        <span id="linha-dd-label">Todas</span>
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 3.5l3 3 3-3"/></svg>
-        <div class="linha-dd-menu" id="linha-dd-menu">
-          <div class="linha-dd-opt" onclick="setLinha(event,'')">Todas</div>
-          <div class="linha-dd-opt" onclick="setLinha(event,'PRIME')"><span class="linha-badge lb-prime">PRIME</span></div>
-          <div class="linha-dd-opt" onclick="setLinha(event,'INFINITY')"><span class="linha-badge lb-infinity">INFINITY</span></div>
-        </div>
-      </div></div>
-    <div class="fsep"></div>
-    <div class="fg"><label>Buscar</label>
-      <input type="text" id="f-search" placeholder="Nome ou código..." oninput="applyFilters()"></div>
-  </div>
-  <div class="fbar-row">
-    <div class="ctabs">
-      <button class="ctab t-all" onclick="setTab('',this)">Todos</button>
-      <button class="ctab" onclick="setTab('Saudável',this)"><span class="d6 s"></span>Saudável</button>
-      <button class="ctab" onclick="setTab('Atenção',this)"><span class="d6 a"></span>Atenção</button>
-      <button class="ctab" onclick="setTab('Crítico',this)"><span class="d6 c"></span>Crítico</button>
-      <button class="ctab t-neg" id="btn-neg" onclick="toggleNegFilter(this)">📉 Negativos</button>
-      <button class="ctab t-virou" id="btn-virou" onclick="toggleVirouFilter(this)">🔻 Virou Negativo</button>
-      <button class="ctab t-virou-pos" id="btn-virou-pos" onclick="toggleVirouPosFilter(this)">🔺 Virou Positivo</button>
-    </div>
-  </div>
-</div>
-
-<div class="main">
-
-  <!-- KPI CARDS — sticky wrapper -->
-  <div class="kpis-wrap">
-    <div class="kpis">
-      <div class="kpi ks" id="ki-s" onclick="kpiClick('Saudável','ki-s')">
-        <div class="kv" style="color:var(--green)" id="kv-s">—</div>
-        <div class="kl">Saudável</div><div class="ks2">PE ≥ 8%</div>
-        <div class="khint">Filtrar ↓</div>
+  <!-- HEADER -->
+  <div class="hdr">
+    <div class="brand">
+      <div class="logo-supera">
+        <span class="logo-sup">supera</span>
+        <span class="logo-farm">farma</span>
       </div>
-      <div class="kpi ka_" id="ki-a" onclick="kpiClick('Atenção','ki-a')">
-        <div class="kv" style="color:var(--yellow)" id="kv-a">—</div>
-        <div class="kl">Atenção</div><div class="ks2">PE 0–8%</div>
-        <div class="khint">Filtrar ↓</div>
+      <div class="brand-divider"></div>
+      <div>
+        <h1>Dashboard Rentabilidade & Desempenho</h1>
+        <p>JAN–ABR 2026</p>
       </div>
-      <div class="kpi kn" id="ki-alr" onclick="kpiClick('ALERTA','ki-alr')">
-        <div class="kv" style="color:var(--orange)" id="kv-alr">—</div>
-        <div class="kl" style="color:var(--orange)">ALERTA</div><div class="ks2">PE neg. + ≥ mercado</div>
-        <div class="khint">Filtrar ↓</div>
-      </div>
-      <div class="kpi kc" id="ki-c" onclick="kpiClick('Crítico','ki-c')">
-        <div class="kv" style="color:#7f1d1d" id="kv-c">—</div>
-        <div class="kl" style="color:#991b1b">Crítico</div><div class="ks2" style="color:#b91c1c">PE negativo + abaixo mercado</div>
-        <div class="khint">Filtrar ↓</div>
-      </div>
-      <!-- hidden placeholders to keep JS happy -->
-      <span id="ki-est" style="display:none"></span>
-      <span id="kv-est" style="display:none"></span>
-      <span id="ki-rec" style="display:none"></span>
-      <span id="kv-rec" style="display:none"></span>
-    </div>
-  </div>
-
-  <!-- ACTIVE FILTER BANNER -->
-  <div class="afb" id="afb">
-    Filtrando por: <b id="afb-lbl">—</b>
-    <button class="afb-clear" onclick="clearKpi()">✕ Limpar filtro</button>
-  </div>
-
-  <!-- LEGEND + MONTH SEL -->
-  <div class="legrow">
-    <span style="color:var(--muted);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Classificação:</span>
-    <span class="li"><span class="d6 s"></span>Saudável</span>
-    <span class="li"><span class="d6 a"></span>Atenção</span>
-    <span class="li"><span class="d6 alr"></span>ALERTA</span>
-    <span class="li"><span class="d6 c"></span>Crítico</span>
-    <button class="btn-legend" onclick="openLegend()">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="7"/><path d="M8 7v5M8 5v.5"/></svg>
-      O que significa cada card?
-    </button>
-    <div style="display:flex;align-items:center;gap:6px;padding:3px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px">
-      <span style="font-size:9px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em" id="lbl-consolidada">Luc. Brasil ABR</span>
-      <span id="kv-med" style="font-family:var(--ff);font-weight:800;font-size:14px;color:var(--green)">—</span>
-    </div>
-    <div class="msel">
-      <span>Ver luc.:</span>
-      <button class="mb" onclick="setVM('JAN')">JAN</button>
-      <button class="mb" onclick="setVM('FEV')">FEV</button>
-      <button class="mb" onclick="setVM('MAR')">MAR</button>
-      <button class="mb ma" onclick="setVM('ABR')">ABR</button>
-    </div>
-  </div>
-
-  <!-- NO DATA STATE -->
-  <div class="no-data-banner" id="no-data">
-    <div style="font-size:40px">📂</div>
-    <h3>Nenhuma planilha carregada</h3>
-    <p>Clique em <strong>Planilhas</strong> no canto superior direito para fazer o upload das planilhas de lucratividade e desempenho.</p>
-    <button class="btn btn-primary" onclick="openUpload()">Carregar planilhas</button>
-  </div>
-
-  <!-- TABLE -->
-  <div class="twrap" id="twrap" style="display:none">
-    <div class="thdr"><h2>Setores</h2><span class="tcnt" id="tcnt">—</span></div>
-    <div class="tscroll" id="tscroll"><table>
-      <thead>
-        <!-- row 1: group labels -->
-        <tr class="thead-groups">
-          <th colspan="4" class="tg-base"></th>
-          <th colspan="1" class="tg-vm">Venda <span style="opacity:.6;font-size:9px">(DDD)</span></th>
-          <th colspan="3" class="tg-ytd gs-ytd">▸ YTD Acumulado <span style="opacity:.6;font-size:9px">(DDD)</span></th>
-          <th colspan="3" class="tg-mes gs-mes">▸ Mês <span id="tg-mes-label">ABR</span> <span style="opacity:.6;font-size:9px">(DDD)</span></th>
-        </tr>
-        <!-- row 2: column names -->
-        <tr>
-          <th class="c-setor" onclick="sortBy('nome')">Setor <span class="si">↕</span></th>
-          <th class="c-hier" onclick="sortBy('hier')">Regional / Distrital <span class="si">↕</span></th>
-          <th class="c-class" onclick="sortBy('classificacao')">Classif. <span class="si">↕</span></th>
-          <th class="c-luc ns" id="th-luc"><div style="font-size:8px;font-weight:800;letter-spacing:.08em;opacity:.7;margin-bottom:2px">LUCRATIVIDADE</div>Luc. <span id="th-mes" style="color:#93c5fd;font-weight:800">ABR</span> / YTD</th>
-          <th class="c-vm sup-col" onclick="sortBy('venda_media')">Méd. Mensal <span class="si">↕</span></th>
-          <th class="c-sytd sup-col gs-ytd" onclick="sortBy('ytd_sup_var')">Sup% <span class="si">↕</span></th>
-          <th class="c-mytd" onclick="sortBy('ytd_merc_var')">Mkt% <span class="si">↕</span></th>
-          <th class="c-shytd sh-col" onclick="sortBy('ytd_share_var')">Var. Share <span class="si">↕</span></th>
-          <th class="c-sabr sup-col gs-mes" onclick="sortBy('abrabr_sup_var')">Sup% <span class="si">↕</span></th>
-          <th class="c-mabr" onclick="sortBy('abrabr_merc_var')">Mkt% <span class="si">↕</span></th>
-          <th class="c-shabr sh-col" onclick="sortBy('abrabr_share_var')">Var. Share <span class="si">↕</span></th>
-        </tr>
-      </thead>
-      <tbody id="tbody"></tbody>
-    </table>
-    </table></div>
-    <div class="pag" id="pag"></div>
-  </div>
-</div>
-
-<!-- UPLOAD PANEL -->
-<div class="upload-overlay" id="upload-overlay" onclick="closeUploadIfBg(event)">
-  <div class="upload-panel">
-    <h2>Planilhas de Dados</h2>
-    <p>Faça o upload das planilhas para atualizar o dashboard. Os dados ficam salvos no navegador.</p>
-    <!-- Instrução compacta -->
-    <div style="background:#f0f6ff;border:1px solid #c7d9f5;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:11px;color:#2d4a7a;line-height:1.6">
-      <span style="font-weight:800">📅 Fluxo mensal:</span>
-      &nbsp;No primeiro acesso suba todas as lucratividades + desempenho atual. A cada novo mês, clique em
-      <b>Limpar dados salvos</b>, adicione a nova lucratividade junto com as anteriores e o desempenho atualizado.<br>
-      <span style="font-weight:800">📁 Nome dos arquivos:</span>
-      &nbsp;O arquivo de lucratividade precisa conter <b>lucratividade</b> e o <b>mês</b> no nome (ex: <em>Lucratividade_ABR26.xlsx</em>). O de desempenho precisa conter <b>desempenho</b> e o <b>mês</b> (ex: <em>Desempenho_ABR26.xlsx</em>).
-    </div>
-
-    <!-- Dois painéis lado a lado -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:4px;align-items:start">
-
-      <!-- Lucratividade -->
-      <div style="border:2px solid #c7d9f5;border-radius:10px;padding:14px;background:#f8fbff">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-          <div style="width:28px;height:28px;border-radius:7px;background:#1e3a5f;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2"><rect x="2" y="1" width="10" height="14" rx="1.5"/><path d="M5 5h6M5 8h6M5 11h4"/></svg>
-          </div>
-          <div>
-            <div style="font-weight:800;font-size:12px;color:#1e3a5f">Lucratividade</div>
-            <div style="font-size:10px;color:#5a7a9a">1 arquivo por mês · acumule JAN a DEZ</div>
-          </div>
-        </div>
-        <div class="file-list" id="luc-list" style="margin-bottom:8px"></div>
-        <div class="file-drop" id="luc-drop" onclick="document.getElementById('luc-input').click()"
-             ondragover="dragOver(event,'luc-drop')" ondragleave="dragLeave('luc-drop')" ondrop="dropFiles(event,'luc')"
-             style="font-size:11px;padding:12px">
-          <input type="file" id="luc-input" multiple accept=".xlsx" onchange="addFiles(this.files,'luc')">
-          ＋ Clique ou arraste os XLSX de lucratividade
-        </div>
-      </div>
-
-      <!-- Desempenho -->
-      <div style="border:2px solid #c8e6c9;border-radius:10px;padding:14px;background:#f8fff8">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-          <div style="width:28px;height:28px;border-radius:7px;background:#1a5c2a;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2"><path d="M2 12l4-4 3 3 5-6"/></svg>
-          </div>
-          <div>
-            <div style="font-weight:800;font-size:12px;color:#1a5c2a">Desempenho</div>
-            <div style="font-size:10px;color:#4a7a5a">1 arquivo · sempre o mais recente</div>
-          </div>
-        </div>
-        <div class="file-list" id="desemp-list" style="margin-bottom:8px"></div>
-        <div class="file-drop" id="desemp-drop" onclick="document.getElementById('desemp-input').click()"
-             ondragover="dragOver(event,'desemp-drop')" ondragleave="dragLeave('desemp-drop')" ondrop="dropFiles(event,'desemp')"
-             style="font-size:11px;padding:12px;border-color:#a5d6a7">
-          <input type="file" id="desemp-input" multiple accept=".xlsx" onchange="addFiles(this.files,'desemp')">
-          ＋ Clique ou arraste o XLSX de desempenho
-        </div>
-      </div>
-
-    </div>
-    <div class="upload-progress" id="upload-progress">
-      <div class="spinner"></div>
-      <span id="progress-msg">Processando planilhas…</span>
-    </div>
-
-    <div class="upload-actions">
-      <button class="btn btn-danger" id="btn-clear" onclick="clearAllData()">🗑 Limpar dados salvos</button>
-      <button class="btn btn-ghost" onclick="closeUpload()">Cancelar</button>
-      <button class="btn btn-primary" id="btn-process" onclick="processFiles()" disabled>Processar e salvar</button>
-    </div>
-  </div>
-</div>
-
-
-<!-- LEGEND MODAL -->
-<div class="legend-modal-overlay" id="legend-overlay" onclick="closeLegendIfBg(event)">
-  <div class="legend-modal">
-    <h2>
-      📋 O que significa cada classificação?
-      <button class="legend-modal-close" onclick="closeLegend()">×</button>
-    </h2>
-    <div style="background:#f0f6ff;border:1px solid #c7d9f5;border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:11.5px;color:#1e3a5f;line-height:1.8">
-      <strong>📐 Como os setores são classificados?</strong><br>
-      Cada setor é avaliado por dois critérios em conjunto:<br>
-      <b>1. Saúde financeira</b> — medida pela <em>folga acima do Ponto de Equilíbrio</em>: o quanto as vendas superam o mínimo necessário para cobrir todos os custos do setor. Quanto maior essa folga, mais seguro é o setor.<br>
-      <b>2. Crescimento de mercado</b> — se o setor está crescendo acima ou abaixo do mercado onde atua.<br>
-      A saúde financeira tem peso maior: um setor com boa folga nunca é classificado como Crítico.
-    </div>
-    <div class="legend-grid">
-      <div class="legend-item">
-        <div class="legend-dot" style="background:var(--green)"></div>
-        <div class="legend-content">
-          <h3 style="color:var(--green)">Saudável</h3>
-          <p>As vendas estão pelo menos <b>8% acima</b> do mínimo necessário para cobrir todos os custos. O colchão financeiro é confortável — independe de como está o crescimento de mercado.</p>
-          <code>Folga acima do Ponto de Equilíbrio ≥ 8%</code>
-        </div>
-      </div>
-      <div class="legend-item">
-        <div class="legend-dot" style="background:var(--yellow)"></div>
-        <div class="legend-content">
-          <h3 style="color:var(--yellow)">Atenção</h3>
-          <p>As vendas estão entre <b>0% e 7,9%</b> acima do mínimo necessário para cobrir os custos. A margem de segurança é pequena e o setor precisa de acompanhamento.</p>
-          <code>Folga 0–8% acima do Ponto de Equilíbrio</code>
-        </div>
-      </div>
-      <div class="legend-item">
-        <div class="legend-dot" style="background:var(--orange)"></div>
-        <div class="legend-content">
-          <h3 style="color:var(--orange)">ALERTA</h3>
-          <p>Vendas abaixo do mínimo necessário, mas o setor está crescendo acima do mercado — no prejuízo porém com sinal de melhora.</p>
-          <code>Folga negativa  e  Supera cresce ≥ mercado</code>
-        </div>
-      </div>
-      <div class="legend-item">
-        <div class="legend-dot" style="background:var(--red)"></div>
-        <div class="legend-content">
-          <h3 style="color:var(--red)">Crítico</h3>
-          <p>As vendas estão <b>abaixo do mínimo necessário</b> para cobrir os custos — o setor opera no prejuízo — <b>e</b> ainda está crescendo abaixo do mercado. Sem resultado financeiro e sem sinal de melhora. Requer ação imediata.</p>
-          <code>Folga negativa  e  Supera cresce &lt; mercado</code>
-        </div>
+      <div class="view-tabs">
+        <button class="view-tab active" id="vt-geral" onclick="switchView('geral')">📊 Geral</button>
+        <button class="view-tab" id="vt-luc" onclick="switchView('luc')">💰 Lucratividade</button>
+        <button class="view-tab" id="vt-tend" onclick="switchView('tend')">📈 Tendência</button>
       </div>
     </div>
-    <div style="padding:10px 12px;background:var(--surface2);border-radius:8px;font-size:11px;color:var(--muted2);line-height:1.6">
-      💡 <strong>Dica:</strong> Clique em qualquer card para filtrar a tabela. Passe o mouse sobre o badge de classificação de um setor para ver o motivo detalhado da classificação.
+    <div class="hcounts">
+      <div class="hc">
+        <div class="hc-v" id="h-tot" style="color:var(--muted2)">—</div>
+        <div class="hc-l">Setores</div>
+      </div>
+      <div class="hc">
+        <div class="hc-v" style="color:var(--green)" id="h-s">—</div>
+        <div class="hc-l">Saudável</div>
+      </div>
+      <div class="hc">
+        <div class="hc-v" style="color:var(--yellow)" id="h-a">—</div>
+        <div class="hc-l">Atenção</div>
+      </div>
+      <div class="hc">
+        <div class="hc-v" style="color:var(--orange)" id="h-alr">—</div>
+        <div class="hc-l">ALERTA</div>
+      </div>
+      <div class="hc">
+        <div class="hc-v" style="color:var(--red)" id="h-c">—</div>
+        <div class="hc-l">Crítico</div>
+      </div>
+      <span id="h-est" style="display:none"></span>
+      <span id="h-rec" style="display:none"></span>
+      <button class="btn-upload btn-export" id="btn-export" onclick="exportExcel()" style="display:none">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M8 3v7M5 7l3 3 3-3M3 12h10" />
+        </svg>
+        Exportar
+      </button>
+      <button class="btn-upload" onclick="openUpload()">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M8 10V3M5 6l3-3 3 3M3 12h10" />
+        </svg>
+        Planilhas
+      </button>
     </div>
   </div>
-</div>
 
-
-<!-- ═══════════════════════════════════════════════════════════════════════ -->
-<!-- VIEW: LUCRATIVIDADE                                                    -->
-<!-- ═══════════════════════════════════════════════════════════════════════ -->
-<div id="view-luc" style="display:none">
-
-  <!-- FILTERS LUC -->
+  <!-- FILTERS -->
   <div class="fbar">
     <div class="fbar-row">
       <div class="fg"><label>Regional</label>
-        <select id="lf-reg" onchange="onLucRegChange()"><option value="">Todas</option></select></div>
-      <div class="fg"><label>Distrital</label>
-        <select id="lf-dist" onchange="renderLuc()"><option value="">Todas</option></select></div>
-      <div class="fsep"></div>
-      <div class="fg"><label>Linha</label>
-        <div class="linha-dd" id="luc-linha-dd" onclick="toggleLucLinhaDd(event)">
-          <span id="luc-linha-dd-label">Todas</span>
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 3.5l3 3 3-3"/></svg>
-          <div class="linha-dd-menu" id="luc-linha-dd-menu">
-            <div class="linha-dd-opt" onclick="setLucLinha(event,'')">Todas</div>
-            <div class="linha-dd-opt" onclick="setLucLinha(event,'PRIME')"><span class="linha-badge lb-prime">PRIME</span></div>
-            <div class="linha-dd-opt" onclick="setLucLinha(event,'INFINITY')"><span class="linha-badge lb-infinity">INFINITY</span></div>
-          </div>
-        </div>
-      </div>
-      <div class="fsep"></div>
-      <div class="fg"><label>Buscar</label>
-        <input type="text" id="lf-search" placeholder="Nome ou código..." oninput="renderLuc()"></div>
-      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
-        <div class="msel">
-          <span>Mês:</span>
-        </div>
-        <div class="msel" id="luc-msel" style="margin-left:0"></div>
-      </div>
-    </div>
-    <div class="fbar-row">
-      <div class="luc-legend">
-        <span class="luc-leg-item"><span class="luc-dot lc-critico"></span>Crítico (negativo)</span>
-        <span class="luc-leg-item"><span class="luc-dot lc-alerta"></span>Alerta (R$0–9.999)</span>
-        <span class="luc-leg-item"><span class="luc-dot lc-atencao"></span>Atenção (R$10K–20K)</span>
-        <span class="luc-leg-item"><span class="luc-dot lc-atencao-leve"></span>Atenção Leve (R$20K–24.999)</span>
-        <span class="luc-leg-item"><span class="luc-dot lc-saudavel"></span>Saudável (≥ R$25K)</span>
-        <div class="ctabs" style="margin-left:auto">
-          <button class="btn-upload" onclick="openMedias()" style="margin-right:6px;background:var(--surface2);border-color:var(--border2);color:var(--fg)">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="12" height="2" rx="1"/><rect x="2" y="7" width="9" height="2" rx="1"/><rect x="2" y="11" width="11" height="2" rx="1"/></svg>
-            Médias
-          </button>
-          <button class="ctab t-neg" id="lbtn-neg" onclick="toggleLucNeg()">📉 Negativos</button>
-          <button class="ctab t-virou" id="lbtn-virou" onclick="toggleLucVirou()">🔻 Virou Negativo</button>
-          <button class="ctab t-virou-pos" id="lbtn-virou-pos" onclick="toggleLucVirouPos()">🔺 Virou Positivo</button>
-        </div>
-        <span id="luc-count" style="font-size:10px;color:var(--muted);font-weight:700;white-space:nowrap"></span>
-        <button class="btn-upload btn-export" onclick="exportLucExcel()" style="margin-left:6px">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3v7M5 7l3 3 3-3M3 12h10"/></svg>
-          Exportar Excel
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- SUMMARY CARDS -->
-  <div class="main" style="padding-top:6px">
-
-    <div class="luc-summary" id="luc-summary"></div>
-
-    <!-- GRID -->
-    <div class="luc-grid" id="luc-grid"></div>
-  </div>
-</div>
-
-<!-- MÉDIAS MODAL -->
-<div class="legend-modal-overlay" id="medias-overlay" onclick="closeMediasIfBg(event)">
-  <div class="legend-modal" style="max-width:1100px;width:96%">
-    <h2>
-      📊 Médias de Rentabilidade
-      <button class="legend-modal-close" onclick="closeMedias()">×</button>
-    </h2>
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
-      <div class="msel" id="medias-msel" style="margin-left:0"></div>
-      <label style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em">Agrupamento:</label>
-      <div style="display:flex;gap:6px">
-        <button class="ctab" id="mg-linha" onclick="setMediasGrupo('linha',this)" style="font-size:11px;padding:4px 10px">Por Linha</button>
-        <button class="ctab" id="mg-reg" onclick="setMediasGrupo('regional',this)" style="font-size:11px;padding:4px 10px">Por Regional</button>
-        <button class="ctab" id="mg-dist" onclick="setMediasGrupo('distrital',this)" style="font-size:11px;padding:4px 10px">Por Distrital</button>
-        <button class="ctab" id="mg-reg-linha" onclick="setMediasGrupo('regional_linha',this)" style="font-size:11px;padding:4px 10px">Regional × Linha</button>
-        <button class="ctab" id="mg-faixas" onclick="setMediasGrupo('faixas',this)" style="font-size:11px;padding:4px 10px">📊 Faixas de Luc%</button>
-      </div>
-    </div>
-    <div id="medias-content" style="max-height:60vh;overflow-y:auto"></div>
-  </div>
-</div>
-
-<!-- ═══════════════════════════════════════════════════════════════════════ -->
-<!-- VIEW: PROJEÇÃO — Tendência Desempenho × Lucratividade                  -->
-<!-- ═══════════════════════════════════════════════════════════════════════ -->
-<div id="view-tend" style="display:none">
-  <div class="fbar">
-    <div class="fbar-row">
-      <div class="fg"><label>Regional</label>
-        <select id="tf-reg" onchange="tendOnReg()"><option value="">Todas</option></select></div>
-      <div class="fg"><label>Distrital</label>
-        <select id="tf-dist" onchange="tendApply()"><option value="">Todas</option></select></div>
-      <div class="fsep"></div>
-      <div class="fg"><label>Linha</label>
-        <select id="tf-linha" onchange="tendLinha=this.value;renderTend()">
-          <option value="">Todas</option><option value="PRIME">PRIME</option><option value="INFINITY">INFINITY</option>
-        </select></div>
-      <div class="fsep"></div>
-      <div class="fg"><label>Ordenar por</label>
-        <select id="tf-sort" onchange="tendApply()">
-          <option value="gap">Falta p/ equilíbrio (maior → menor)</option>
-          <option value="queda">Tendência (pior → melhor)</option>
-          <option value="tri">Crescimento no TRI (maior → menor)</option>
-          <option value="fat">Faturamento (maior → menor)</option>
-        </select></div>
-      <div class="fsep"></div>
-      <div class="fg"><label>Faixa lucr.%</label>
-        <select id="tf-faixa" onchange="tendSetFaixa(this.value)">
+        <select id="f-reg" onchange="onRegChange()">
           <option value="">Todas</option>
-          <option value="pos">Positivos (todas)</option>
-          <option value="f1">De 0,1% a 5%</option>
-          <option value="f2">De 5% a 10%</option>
-          <option value="f3">De 10,1% até 13,3%</option>
-          <option value="f4">Acima de 13,4%</option>
-          <option value="neg">Negativos</option>
-        </select></div>
+        </select>
+      </div>
+      <div class="fg"><label>Distrital</label>
+        <select id="f-dist" onchange="applyFilters()">
+          <option value="">Todas</option>
+        </select>
+      </div>
+      <div class="fsep"></div>
+      <div class="fg"><label>Meses neg.</label>
+        <select id="f-neg" onchange="applyFilters()">
+          <option value="">Todos</option>
+          <option value="1">≥ 1</option>
+          <option value="2">≥ 2</option>
+          <option value="3">≥ 3</option>
+          <option value="4">4 meses</option>
+        </select>
+      </div>
+      <div class="fg"><label>Share YTD</label>
+        <select id="f-share" onchange="applyFilters()">
+          <option value="">Todos</option>
+          <option value="beat">Ganhou share</option>
+          <option value="miss">Perdeu share</option>
+        </select>
+      </div>
+      <div class="fsep"></div>
+      <div class="fg"><label>Linha</label>
+        <div class="linha-dd" id="linha-dd" onclick="toggleLinhaDd(event)">
+          <span id="linha-dd-label">Todas</span>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M2 3.5l3 3 3-3" />
+          </svg>
+          <div class="linha-dd-menu" id="linha-dd-menu">
+            <div class="linha-dd-opt" onclick="setLinha(event,'')">Todas</div>
+            <div class="linha-dd-opt" onclick="setLinha(event,'PRIME')"><span class="linha-badge lb-prime">PRIME</span>
+            </div>
+            <div class="linha-dd-opt" onclick="setLinha(event,'INFINITY')"><span
+                class="linha-badge lb-infinity">INFINITY</span></div>
+          </div>
+        </div>
+      </div>
       <div class="fsep"></div>
       <div class="fg"><label>Buscar</label>
-        <input type="text" id="tf-search" placeholder="Nome ou código..." oninput="tendApply()"></div>
-      <span id="tend-count" style="margin-left:auto;font-size:10px;color:var(--muted);font-weight:700;white-space:nowrap"></span>
+        <input type="text" id="f-search" placeholder="Nome ou código..." oninput="applyFilters()">
+      </div>
+    </div>
+    <div class="fbar-row">
+      <div class="ctabs">
+        <button class="ctab t-all" onclick="setTab('',this)">Todos</button>
+        <button class="ctab" onclick="setTab('Saudável',this)"><span class="d6 s"></span>Saudável</button>
+        <button class="ctab" onclick="setTab('Atenção',this)"><span class="d6 a"></span>Atenção</button>
+        <button class="ctab" onclick="setTab('Crítico',this)"><span class="d6 c"></span>Crítico</button>
+        <button class="ctab t-neg" id="btn-neg" onclick="toggleNegFilter(this)">📉 Negativos</button>
+        <button class="ctab t-virou" id="btn-virou" onclick="toggleVirouFilter(this)">🔻 Virou Negativo</button>
+        <button class="ctab t-virou-pos" id="btn-virou-pos" onclick="toggleVirouPosFilter(this)">🔺 Virou
+          Positivo</button>
+      </div>
     </div>
   </div>
 
-  <div class="main" style="padding-top:8px">
-    <div class="tend-intro">
-      📈 <b>Tendência × Equilíbrio × Mercado.</b> A classificação segue o <b>nível de lucratividade</b> (setor muito negativo é Crítico, não importa a tendência). Para os demais, lemos a <b>tendência</b> comparando o ritmo do Trimestre com YTD e MAT (12m), o <b>equilíbrio mensal</b> (quanto de faturamento PPP falta/sobra para dar lucro) e a <b>competitividade vs mercado</b> (ganhando ou perdendo share). Clique num setor para o detalhe.
+  <div class="main">
+
+    <!-- KPI CARDS — sticky wrapper -->
+    <div class="kpis-wrap">
+      <div class="kpis">
+        <div class="kpi ks" id="ki-s" onclick="kpiClick('Saudável','ki-s')">
+          <div class="kv" style="color:var(--green)" id="kv-s">—</div>
+          <div class="kl">Saudável</div>
+          <div class="ks2">PE ≥ 8%</div>
+          <div class="khint">Filtrar ↓</div>
+        </div>
+        <div class="kpi ka_" id="ki-a" onclick="kpiClick('Atenção','ki-a')">
+          <div class="kv" style="color:var(--yellow)" id="kv-a">—</div>
+          <div class="kl">Atenção</div>
+          <div class="ks2">PE 0–8%</div>
+          <div class="khint">Filtrar ↓</div>
+        </div>
+        <div class="kpi kn" id="ki-alr" onclick="kpiClick('ALERTA','ki-alr')">
+          <div class="kv" style="color:var(--orange)" id="kv-alr">—</div>
+          <div class="kl" style="color:var(--orange)">ALERTA</div>
+          <div class="ks2">PE neg. + ≥ mercado</div>
+          <div class="khint">Filtrar ↓</div>
+        </div>
+        <div class="kpi kc" id="ki-c" onclick="kpiClick('Crítico','ki-c')">
+          <div class="kv" style="color:#7f1d1d" id="kv-c">—</div>
+          <div class="kl" style="color:#991b1b">Crítico</div>
+          <div class="ks2" style="color:#b91c1c">PE negativo + abaixo mercado</div>
+          <div class="khint">Filtrar ↓</div>
+        </div>
+        <!-- hidden placeholders to keep JS happy -->
+        <span id="ki-est" style="display:none"></span>
+        <span id="kv-est" style="display:none"></span>
+        <span id="ki-rec" style="display:none"></span>
+        <span id="kv-rec" style="display:none"></span>
+      </div>
     </div>
-    <div class="tend-cap">Filtro por Tendência <span>· clique num card para filtrar por momentum</span></div>
-    <div class="tend-summary" id="tend-summary"></div>
 
-    <!-- FAIXAS DE LUCRATIVIDADE (%) — filtro compacto + totais -->
-    <div class="tend-cap">Filtro por Faixa de Lucratividade <span>· clique numa faixa para filtrar por atingimento</span></div>
-    <div class="tfx-bar" id="tend-faixas"></div>
+    <!-- ACTIVE FILTER BANNER -->
+    <div class="afb" id="afb">
+      Filtrando por: <b id="afb-lbl">—</b>
+      <button class="afb-clear" onclick="clearKpi()">✕ Limpar filtro</button>
+    </div>
 
-    <div class="tend-grid" id="tend-grid"></div>
+    <!-- LEGEND + MONTH SEL -->
+    <div class="legrow">
+      <span
+        style="color:var(--muted);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Classificação:</span>
+      <span class="li"><span class="d6 s"></span>Saudável</span>
+      <span class="li"><span class="d6 a"></span>Atenção</span>
+      <span class="li"><span class="d6 alr"></span>ALERTA</span>
+      <span class="li"><span class="d6 c"></span>Crítico</span>
+      <button class="btn-legend" onclick="openLegend()">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="8" cy="8" r="7" />
+          <path d="M8 7v5M8 5v.5" />
+        </svg>
+        O que significa cada card?
+      </button>
+      <div
+        style="display:flex;align-items:center;gap:6px;padding:3px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px">
+        <span style="font-size:9px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em"
+          id="lbl-consolidada">Luc. Brasil ABR</span>
+        <span id="kv-med" style="font-family:var(--ff);font-weight:800;font-size:14px;color:var(--green)">—</span>
+      </div>
+      <div class="msel">
+        <span>Ver luc.:</span>
+        <button class="mb" onclick="setVM('JAN')">JAN</button>
+        <button class="mb" onclick="setVM('FEV')">FEV</button>
+        <button class="mb" onclick="setVM('MAR')">MAR</button>
+        <button class="mb ma" onclick="setVM('ABR')">ABR</button>
+      </div>
+    </div>
+
+    <!-- NO DATA STATE -->
+    <div class="no-data-banner" id="no-data">
+      <div style="font-size:40px">📂</div>
+      <h3>Nenhuma planilha carregada</h3>
+      <p>Clique em <strong>Planilhas</strong> no canto superior direito para fazer o upload das planilhas de
+        lucratividade e desempenho.</p>
+      <button class="btn btn-primary" onclick="openUpload()">Carregar planilhas</button>
+    </div>
+
+    <!-- TABLE -->
+    <div class="twrap" id="twrap" style="display:none">
+      <div class="thdr">
+        <h2>Setores</h2><span class="tcnt" id="tcnt">—</span>
+      </div>
+      <div class="tscroll" id="tscroll">
+        <table>
+          <thead>
+            <!-- row 1: group labels -->
+            <tr class="thead-groups">
+              <th colspan="4" class="tg-base"></th>
+              <th colspan="1" class="tg-vm">Venda <span style="opacity:.6;font-size:9px">(DDD)</span></th>
+              <th colspan="3" class="tg-ytd gs-ytd">▸ YTD Acumulado <span style="opacity:.6;font-size:9px">(DDD)</span>
+              </th>
+              <th colspan="3" class="tg-mes gs-mes">▸ Mês <span id="tg-mes-label">ABR</span> <span
+                  style="opacity:.6;font-size:9px">(DDD)</span></th>
+            </tr>
+            <!-- row 2: column names -->
+            <tr>
+              <th class="c-setor" onclick="sortBy('nome')">Setor <span class="si">↕</span></th>
+              <th class="c-hier" onclick="sortBy('hier')">Regional / Distrital <span class="si">↕</span></th>
+              <th class="c-class" onclick="sortBy('classificacao')">Classif. <span class="si">↕</span></th>
+              <th class="c-luc ns" id="th-luc">
+                <div style="font-size:8px;font-weight:800;letter-spacing:.08em;opacity:.7;margin-bottom:2px">
+                  LUCRATIVIDADE</div>Luc. <span id="th-mes" style="color:#93c5fd;font-weight:800">ABR</span> / YTD
+              </th>
+              <th class="c-vm sup-col" onclick="sortBy('venda_media')">Méd. Mensal <span class="si">↕</span></th>
+              <th class="c-sytd sup-col gs-ytd" onclick="sortBy('ytd_sup_var')">Sup% <span class="si">↕</span></th>
+              <th class="c-mytd" onclick="sortBy('ytd_merc_var')">Mkt% <span class="si">↕</span></th>
+              <th class="c-shytd sh-col" onclick="sortBy('ytd_share_var')">Var. Share <span class="si">↕</span></th>
+              <th class="c-sabr sup-col gs-mes" onclick="sortBy('abrabr_sup_var')">Sup% <span class="si">↕</span></th>
+              <th class="c-mabr" onclick="sortBy('abrabr_merc_var')">Mkt% <span class="si">↕</span></th>
+              <th class="c-shabr sh-col" onclick="sortBy('abrabr_share_var')">Var. Share <span class="si">↕</span></th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+        </table>
+      </div>
+      <div class="pag" id="pag"></div>
+    </div>
   </div>
-</div>
 
-<!-- DETALHE DO SETOR (PROJEÇÃO) -->
-<div class="tend-detail-overlay" id="tend-detail-overlay" onclick="tendCloseDetailIfBg(event)">
-  <div class="tend-detail">
-    <button class="legend-modal-close" onclick="tendCloseDetail()" style="position:absolute;top:14px;right:16px">×</button>
-    <div id="tend-detail-body"></div>
+  <!-- UPLOAD PANEL -->
+  <div class="upload-overlay" id="upload-overlay" onclick="closeUploadIfBg(event)">
+    <div class="upload-panel">
+      <h2>Planilhas de Dados</h2>
+      <p>Faça o upload das planilhas para atualizar o dashboard. Os dados ficam salvos no navegador.</p>
+      <!-- Instrução compacta -->
+      <div
+        style="background:#f0f6ff;border:1px solid #c7d9f5;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:11px;color:#2d4a7a;line-height:1.6">
+        <span style="font-weight:800">📅 Fluxo mensal:</span>
+        &nbsp;No primeiro acesso suba todas as lucratividades + desempenho atual. A cada novo mês, clique em
+        <b>Limpar dados salvos</b>, adicione a nova lucratividade junto com as anteriores e o desempenho atualizado.<br>
+        <span style="font-weight:800">📁 Nome dos arquivos:</span>
+        &nbsp;O arquivo de lucratividade precisa conter <b>lucratividade</b> e o <b>mês</b> no nome (ex:
+        <em>Lucratividade_ABR26.xlsx</em>). O de desempenho precisa conter <b>desempenho</b> e o <b>mês</b> (ex:
+        <em>Desempenho_ABR26.xlsx</em>).
+      </div>
+
+      <!-- Dois painéis lado a lado -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:4px;align-items:start">
+
+        <!-- Lucratividade -->
+        <div style="border:2px solid #c7d9f5;border-radius:10px;padding:14px;background:#f8fbff">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <div
+              style="width:28px;height:28px;border-radius:7px;background:#1e3a5f;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2">
+                <rect x="2" y="1" width="10" height="14" rx="1.5" />
+                <path d="M5 5h6M5 8h6M5 11h4" />
+              </svg>
+            </div>
+            <div>
+              <div style="font-weight:800;font-size:12px;color:#1e3a5f">Lucratividade</div>
+              <div style="font-size:10px;color:#5a7a9a">1 arquivo por mês · acumule JAN a DEZ</div>
+            </div>
+          </div>
+          <div class="file-list" id="luc-list" style="margin-bottom:8px"></div>
+          <div class="file-drop" id="luc-drop" onclick="document.getElementById('luc-input').click()"
+            ondragover="dragOver(event,'luc-drop')" ondragleave="dragLeave('luc-drop')" ondrop="dropFiles(event,'luc')"
+            style="font-size:11px;padding:12px">
+            <input type="file" id="luc-input" multiple accept=".xlsx" onchange="addFiles(this.files,'luc')">
+            ＋ Clique ou arraste os XLSX de lucratividade
+          </div>
+        </div>
+
+        <!-- Desempenho -->
+        <div style="border:2px solid #c8e6c9;border-radius:10px;padding:14px;background:#f8fff8">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <div
+              style="width:28px;height:28px;border-radius:7px;background:#1a5c2a;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2">
+                <path d="M2 12l4-4 3 3 5-6" />
+              </svg>
+            </div>
+            <div>
+              <div style="font-weight:800;font-size:12px;color:#1a5c2a">Desempenho</div>
+              <div style="font-size:10px;color:#4a7a5a">1 arquivo · sempre o mais recente</div>
+            </div>
+          </div>
+          <div class="file-list" id="desemp-list" style="margin-bottom:8px"></div>
+          <div class="file-drop" id="desemp-drop" onclick="document.getElementById('desemp-input').click()"
+            ondragover="dragOver(event,'desemp-drop')" ondragleave="dragLeave('desemp-drop')"
+            ondrop="dropFiles(event,'desemp')" style="font-size:11px;padding:12px;border-color:#a5d6a7">
+            <input type="file" id="desemp-input" multiple accept=".xlsx" onchange="addFiles(this.files,'desemp')">
+            ＋ Clique ou arraste o XLSX de desempenho
+          </div>
+        </div>
+
+      </div>
+      <div class="upload-progress" id="upload-progress">
+        <div class="spinner"></div>
+        <span id="progress-msg">Processando planilhas…</span>
+      </div>
+
+      <div class="upload-actions">
+        <button class="btn btn-danger" id="btn-clear" onclick="clearAllData()">🗑 Limpar dados salvos</button>
+        <button class="btn btn-ghost" onclick="closeUpload()">Cancelar</button>
+        <button class="btn btn-primary" id="btn-process" onclick="processFiles()" disabled>Processar e salvar</button>
+      </div>
+    </div>
   </div>
-</div>
 
-<script src="script.js"></script>
+
+  <!-- LEGEND MODAL -->
+  <div class="legend-modal-overlay" id="legend-overlay" onclick="closeLegendIfBg(event)">
+    <div class="legend-modal">
+      <h2>
+        📋 O que significa cada classificação?
+        <button class="legend-modal-close" onclick="closeLegend()">×</button>
+      </h2>
+      <div
+        style="background:#f0f6ff;border:1px solid #c7d9f5;border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:11.5px;color:#1e3a5f;line-height:1.8">
+        <strong>📐 Como os setores são classificados?</strong><br>
+        Cada setor é avaliado por dois critérios em conjunto:<br>
+        <b>1. Saúde financeira</b> — medida pela <em>folga acima do Ponto de Equilíbrio</em>: o quanto as vendas superam
+        o mínimo necessário para cobrir todos os custos do setor. Quanto maior essa folga, mais seguro é o setor.<br>
+        <b>2. Crescimento de mercado</b> — se o setor está crescendo acima ou abaixo do mercado onde atua.<br>
+        A saúde financeira tem peso maior: um setor com boa folga nunca é classificado como Crítico.
+      </div>
+      <div class="legend-grid">
+        <div class="legend-item">
+          <div class="legend-dot" style="background:var(--green)"></div>
+          <div class="legend-content">
+            <h3 style="color:var(--green)">Saudável</h3>
+            <p>As vendas estão pelo menos <b>8% acima</b> do mínimo necessário para cobrir todos os custos. O colchão
+              financeiro é confortável — independe de como está o crescimento de mercado.</p>
+            <code>Folga acima do Ponto de Equilíbrio ≥ 8%</code>
+          </div>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:var(--yellow)"></div>
+          <div class="legend-content">
+            <h3 style="color:var(--yellow)">Atenção</h3>
+            <p>As vendas estão entre <b>0% e 7,9%</b> acima do mínimo necessário para cobrir os custos. A margem de
+              segurança é pequena e o setor precisa de acompanhamento.</p>
+            <code>Folga 0–8% acima do Ponto de Equilíbrio</code>
+          </div>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:var(--orange)"></div>
+          <div class="legend-content">
+            <h3 style="color:var(--orange)">ALERTA</h3>
+            <p>Vendas abaixo do mínimo necessário, mas o setor está crescendo acima do mercado — no prejuízo porém com
+              sinal de melhora.</p>
+            <code>Folga negativa  e  Supera cresce ≥ mercado</code>
+          </div>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:var(--red)"></div>
+          <div class="legend-content">
+            <h3 style="color:var(--red)">Crítico</h3>
+            <p>As vendas estão <b>abaixo do mínimo necessário</b> para cobrir os custos — o setor opera no prejuízo —
+              <b>e</b> ainda está crescendo abaixo do mercado. Sem resultado financeiro e sem sinal de melhora. Requer
+              ação imediata.</p>
+            <code>Folga negativa  e  Supera cresce &lt; mercado</code>
+          </div>
+        </div>
+      </div>
+      <div
+        style="padding:10px 12px;background:var(--surface2);border-radius:8px;font-size:11px;color:var(--muted2);line-height:1.6">
+        💡 <strong>Dica:</strong> Clique em qualquer card para filtrar a tabela. Passe o mouse sobre o badge de
+        classificação de um setor para ver o motivo detalhado da classificação.
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- VIEW: LUCRATIVIDADE                                                    -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <div id="view-luc" style="display:none">
+
+    <!-- FILTERS LUC -->
+    <div class="fbar">
+      <div class="fbar-row">
+        <div class="fg"><label>Regional</label>
+          <select id="lf-reg" onchange="onLucRegChange()">
+            <option value="">Todas</option>
+          </select>
+        </div>
+        <div class="fg"><label>Distrital</label>
+          <select id="lf-dist" onchange="renderLuc()">
+            <option value="">Todas</option>
+          </select>
+        </div>
+        <div class="fsep"></div>
+        <div class="fg"><label>Linha</label>
+          <div class="linha-dd" id="luc-linha-dd" onclick="toggleLucLinhaDd(event)">
+            <span id="luc-linha-dd-label">Todas</span>
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M2 3.5l3 3 3-3" />
+            </svg>
+            <div class="linha-dd-menu" id="luc-linha-dd-menu">
+              <div class="linha-dd-opt" onclick="setLucLinha(event,'')">Todas</div>
+              <div class="linha-dd-opt" onclick="setLucLinha(event,'PRIME')"><span
+                  class="linha-badge lb-prime">PRIME</span></div>
+              <div class="linha-dd-opt" onclick="setLucLinha(event,'INFINITY')"><span
+                  class="linha-badge lb-infinity">INFINITY</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="fsep"></div>
+        <div class="fg"><label>Buscar</label>
+          <input type="text" id="lf-search" placeholder="Nome ou código..." oninput="renderLuc()">
+        </div>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+          <div class="msel">
+            <span>Mês:</span>
+          </div>
+          <div class="msel" id="luc-msel" style="margin-left:0"></div>
+        </div>
+      </div>
+      <div class="fbar-row">
+        <div class="luc-legend">
+          <span class="luc-leg-item"><span class="luc-dot lc-critico"></span>Crítico (negativo)</span>
+          <span class="luc-leg-item"><span class="luc-dot lc-alerta"></span>Alerta (R$0–9.999)</span>
+          <span class="luc-leg-item"><span class="luc-dot lc-atencao"></span>Atenção (R$10K–20K)</span>
+          <span class="luc-leg-item"><span class="luc-dot lc-atencao-leve"></span>Atenção Leve (R$20K–24.999)</span>
+          <span class="luc-leg-item"><span class="luc-dot lc-saudavel"></span>Saudável (≥ R$25K)</span>
+          <div class="ctabs" style="margin-left:auto">
+            <button class="btn-upload" onclick="openMedias()"
+              style="margin-right:6px;background:var(--surface2);border-color:var(--border2);color:var(--fg)">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="3" width="12" height="2" rx="1" />
+                <rect x="2" y="7" width="9" height="2" rx="1" />
+                <rect x="2" y="11" width="11" height="2" rx="1" />
+              </svg>
+              Médias
+            </button>
+            <button class="ctab t-neg" id="lbtn-neg" onclick="toggleLucNeg()">📉 Negativos</button>
+            <button class="ctab t-virou" id="lbtn-virou" onclick="toggleLucVirou()">🔻 Virou Negativo</button>
+            <button class="ctab t-virou-pos" id="lbtn-virou-pos" onclick="toggleLucVirouPos()">🔺 Virou
+              Positivo</button>
+          </div>
+          <span id="luc-count" style="font-size:10px;color:var(--muted);font-weight:700;white-space:nowrap"></span>
+          <button class="btn-upload btn-export" onclick="exportLucExcel()" style="margin-left:6px">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M8 3v7M5 7l3 3 3-3M3 12h10" />
+            </svg>
+            Exportar Excel
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SUMMARY CARDS -->
+    <div class="main" style="padding-top:6px">
+
+      <div class="luc-summary" id="luc-summary"></div>
+
+      <!-- GRID -->
+      <div class="luc-grid" id="luc-grid"></div>
+    </div>
+  </div>
+
+  <!-- MÉDIAS MODAL -->
+  <div class="legend-modal-overlay" id="medias-overlay" onclick="closeMediasIfBg(event)">
+    <div class="legend-modal" style="max-width:1100px;width:96%">
+      <h2>
+        📊 Médias de Rentabilidade
+        <button class="legend-modal-close" onclick="closeMedias()">×</button>
+      </h2>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+        <div class="msel" id="medias-msel" style="margin-left:0"></div>
+        <label
+          style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em">Agrupamento:</label>
+        <div style="display:flex;gap:6px">
+          <button class="ctab" id="mg-linha" onclick="setMediasGrupo('linha',this)"
+            style="font-size:11px;padding:4px 10px">Por Linha</button>
+          <button class="ctab" id="mg-reg" onclick="setMediasGrupo('regional',this)"
+            style="font-size:11px;padding:4px 10px">Por Regional</button>
+          <button class="ctab" id="mg-dist" onclick="setMediasGrupo('distrital',this)"
+            style="font-size:11px;padding:4px 10px">Por Distrital</button>
+          <button class="ctab" id="mg-reg-linha" onclick="setMediasGrupo('regional_linha',this)"
+            style="font-size:11px;padding:4px 10px">Regional × Linha</button>
+          <button class="ctab" id="mg-faixas" onclick="setMediasGrupo('faixas',this)"
+            style="font-size:11px;padding:4px 10px">📊 Faixas de Luc%</button>
+        </div>
+      </div>
+      <div id="medias-content" style="max-height:60vh;overflow-y:auto"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- VIEW: PROJEÇÃO — Tendência Desempenho × Lucratividade                  -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <div id="view-tend" style="display:none">
+    <div class="fbar">
+      <div class="fbar-row">
+        <div class="fg"><label>Regional</label>
+          <select id="tf-reg" onchange="tendOnReg()">
+            <option value="">Todas</option>
+          </select>
+        </div>
+        <div class="fg"><label>Distrital</label>
+          <select id="tf-dist" onchange="tendApply()">
+            <option value="">Todas</option>
+          </select>
+        </div>
+        <div class="fsep"></div>
+        <div class="fg"><label>Linha</label>
+          <select id="tf-linha" onchange="tendLinha=this.value;renderTend()">
+            <option value="">Todas</option>
+            <option value="PRIME">PRIME</option>
+            <option value="INFINITY">INFINITY</option>
+          </select>
+        </div>
+        <div class="fsep"></div>
+        <div class="fg"><label>Ordenar por</label>
+          <select id="tf-sort" onchange="tendApply()">
+            <option value="gap">Falta p/ equilíbrio (maior → menor)</option>
+            <option value="queda">Tendência (pior → melhor)</option>
+            <option value="tri">Crescimento no TRI (maior → menor)</option>
+            <option value="fat">Faturamento (maior → menor)</option>
+          </select>
+        </div>
+        <div class="fsep"></div>
+        <div class="fg"><label>Faixa lucr.%</label>
+          <select id="tf-faixa" onchange="tendSetFaixa(this.value)">
+            <option value="">Todas</option>
+            <option value="pos">Positivos (todas)</option>
+            <option value="f1">De 0,1% a 5%</option>
+            <option value="f2">De 5% a 10%</option>
+            <option value="f3">De 10,1% até 13,3%</option>
+            <option value="f4">Acima de 13,4%</option>
+            <option value="neg">Negativos</option>
+          </select>
+        </div>
+        <div class="fsep"></div>
+        <div class="fg"><label>Buscar</label>
+          <input type="text" id="tf-search" placeholder="Nome ou código..." oninput="tendApply()">
+        </div>
+        <span id="tend-count"
+          style="margin-left:auto;font-size:10px;color:var(--muted);font-weight:700;white-space:nowrap"></span>
+      </div>
+    </div>
+
+    <div class="main" style="padding-top:8px">
+      <div class="tend-intro">
+        📈 <b>Tendência × Equilíbrio × Mercado.</b> A classificação segue o <b>nível de lucratividade</b> (setor muito
+        negativo é Crítico, não importa a tendência). Para os demais, lemos a <b>tendência</b> comparando o ritmo do
+        Trimestre com YTD e MAT (12m), o <b>equilíbrio mensal</b> (quanto de faturamento PPP falta/sobra para dar lucro)
+        e a <b>competitividade vs mercado</b> (ganhando ou perdendo share). Clique num setor para o detalhe.
+      </div>
+      <div class="tend-cap">Filtro por Tendência <span>· clique num card para filtrar por momentum</span></div>
+      <div class="tend-summary" id="tend-summary"></div>
+
+      <!-- FAIXAS DE LUCRATIVIDADE (%) — filtro compacto + totais -->
+      <div class="tend-cap">Filtro por Faixa de Lucratividade <span>· clique numa faixa para filtrar por
+          atingimento</span></div>
+      <div class="tfx-bar" id="tend-faixas"></div>
+
+      <div class="tend-grid" id="tend-grid"></div>
+    </div>
+  </div>
+
+  <!-- DETALHE DO SETOR (PROJEÇÃO) -->
+  <div class="tend-detail-overlay" id="tend-detail-overlay" onclick="tendCloseDetailIfBg(event)">
+    <div class="tend-detail">
+      <button class="legend-modal-close" onclick="tendCloseDetail()"
+        style="position:absolute;top:14px;right:16px">×</button>
+      <div id="tend-detail-body"></div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
 </body>
+
 </html>
