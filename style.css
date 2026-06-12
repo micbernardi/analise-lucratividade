@@ -3079,7 +3079,10 @@ thead tr:not(.thead-groups) th {
 .tend-warn + * { } 
 
 /* ── Projeção v3: Crítico + competitividade (share) ── */
-.tend-summary { grid-template-columns: repeat(6, 1fr); }
+.tend-summary { grid-template-columns: repeat(4, 1fr); }
+/* Estagnado: flat + perdendo share */
+.tend-sum.mc-stg::after { background: #a16207; }
+.tend-card.mc-stg { border-left-color: #a16207; }
 .tend-sum.mc-per::after { background: var(--yellow); }
 .tend-sum.mc-que::after { background: var(--orange); }
 .tend-sum.mc-cri::after { background: var(--red); }
