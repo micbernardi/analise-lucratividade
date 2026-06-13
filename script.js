@@ -3241,10 +3241,10 @@ function tendSyncFilters() {
 // ── Detalhe ───────────────────────────────────────────────────────────────────
 function tendVerdict(m, be) {
   const txt = {
-    acelera: `<b style="color:var(--green)">Acelerando</b> — o trimestre (${tPP(m.tri)}) cresce acima do YTD (${tPP(m.ytd)}) e do MAT (${tPP(m.mat)})`,
+    acelera: `<b style="color:var(--green)">Acelerando</b> — o trimestre (${tPP(m.tri)}) cresce acima do YTD (${tPP(m.ytd)})${m.mat == null ? '' : (m.tri - m.mat > T_BAND ? ` e do MAT (${tPP(m.mat)})` : (m.tri - m.mat < -T_BAND ? `, embora ainda abaixo do ritmo de 12 meses / MAT (${tPP(m.mat)})` : ` e em linha com o MAT (${tPP(m.mat)})`))}`,
     recupera: `<b style="color:var(--blue)">Recuperando</b> — ainda abaixo do equilíbrio, mas ${m.turnaround ? `saindo de um histórico negativo de 12m (MAT ${tPP(m.mat)})` : m.gStar != null ? `o ritmo do trimestre (${tPP(m.tri)}) já cobre o crescimento necessário para empatar (${tPP(m.gStar)})` : `crescendo forte`} — puxando a lucratividade para cima`,
-    estavel: `<b>Estável</b> — lucrativo, com crescimento parelho (trimestre ${tPP(m.tri)}, YTD ${tPP(m.ytd)}) e acompanhando o mercado`,
-    estagnado: `<b style="color:#a16207">Estagnado</b> — lucrativo, mas com crescimento parado (trimestre ${tPP(m.tri)}, YTD ${tPP(m.ytd)}) e <b>perdendo share</b> (${tPP(m.tri)} vs mercado ${tPP(m.mTri)}) — está ficando para trás`,
+    estavel: `<b>Estável</b> — lucrativo, ${m.tri - m.ytd < -T_BAND ? `com o trimestre (${tPP(m.tri)}) abaixo do YTD (${tPP(m.ytd)}), mas segurando o ritmo de 12 meses (MAT ${tPP(m.mat)})` : `com crescimento parelho (trimestre ${tPP(m.tri)}, YTD ${tPP(m.ytd)})`} e acompanhando o mercado`,
+    estagnado: `<b style="color:#a16207">Estagnado</b> — lucrativo, mas ${m.tri - m.ytd < -T_BAND ? `com o trimestre (${tPP(m.tri)}) abaixo do YTD (${tPP(m.ytd)})` : `com crescimento parado (trimestre ${tPP(m.tri)}, YTD ${tPP(m.ytd)})`} e <b>perdendo share</b> (${tPP(m.tri)} vs mercado ${tPP(m.mTri)}) — está ficando para trás`,
     perde: `<b style="color:var(--yellow)">Desacelerando</b> — ainda lucrativo, mas o trimestre (${tPP(m.tri)}) ficou abaixo do YTD (${tPP(m.ytd)}) e do ritmo de 12 meses / MAT (${tPP(m.mat)})`,
     queda: `<b style="color:var(--orange)">Em queda</b> — lucrativo, mas o trimestre virou negativo (${tPP(m.tri)})` + (m.quedaTrend === 'menos' ? `, caindo menos que o YTD — ritmo de queda diminuindo` : m.quedaTrend === 'mais' ? `, abaixo do YTD — queda se aprofundando` : ` — caindo no mesmo ritmo do YTD`),
     critico: (() => {
