@@ -714,6 +714,10 @@ async function processFiles() {
     // ── 1. Read all lucratividade files ──────────────────────────────────────
     const lucData = {};
     const regMap = {}, distMap = {};
+    // Índice (em MESES) do mês de origem de cada nome em regMap/distMap. Garante
+    // que o nome do GR/GD venha SEMPRE do mês mais recente, mesmo que os arquivos
+    // sejam enviados fora de ordem (ex.: seleção alfabética coloca MAR depois de MAI).
+    const regMapMes = {}, distMapMes = {};
     const brasilLucMap = {}, grLucMap = {}, gdLucMap = {};
     const fileNames = { luc: pendingLuc.map(f => f.name), desemp: pendingDesemp.map(f => f.name) };
 
@@ -789,11 +793,15 @@ async function processFiles() {
         } else if (cargo === 'GR') {
           const rcode = String(row[0] || '').replace('.0', '').trim().padStart(6, '0');
           grLucMap[mes][rcode] = safeNum(row[lucIdx]);
-          regMap[rcode] = String(row[4] || '').replace(/^\d+\s*-\s*/, '').trim();
+          const rnome = String(row[4] || '').replace(/^\d+\s*-\s*/, '').trim();
+          const rmi = MESES.indexOf(mes);
+          if (rnome && rmi >= (regMapMes[rcode] ?? -1)) { regMap[rcode] = rnome; regMapMes[rcode] = rmi; }
         } else if (cargo === 'GD') {
           const dcode = String(row[1] || '').replace('.0', '').trim().padStart(6, '0');
           gdLucMap[mes][dcode] = safeNum(row[lucIdx]);
-          distMap[dcode] = String(row[4] || '').replace(/^\d+\s*-\s*/, '').trim();
+          const dnome = String(row[4] || '').replace(/^\d+\s*-\s*/, '').trim();
+          const dmi = MESES.indexOf(mes);
+          if (dnome && dmi >= (distMapMes[dcode] ?? -1)) { distMap[dcode] = dnome; distMapMes[dcode] = dmi; }
         }
 
         if (cargo !== 'PV') continue;
@@ -803,16 +811,6 @@ async function processFiles() {
         const nome = fdv.replace(/^\d+\s*-\s*/, '').trim();
         const reg = String(row[0] || '').trim();
         const dist = String(row[1] || '').trim();
-
-        // Build maps from GR/GD rows for names
-        if (cargo === 'GR') {
-          const rcode = String(row[0] || '').replace('.0', '').trim().padStart(6, '0');
-          regMap[rcode] = fdv.replace(/^\d+\s*-\s*/, '').trim();
-        }
-        if (cargo === 'GD') {
-          const dcode = String(row[1] || '').replace('.0', '').trim().padStart(6, '0');
-          distMap[dcode] = fdv.replace(/^\d+\s*-\s*/, '').trim();
-        }
 
         const linha = String(row[3] || '').trim().toUpperCase();
         lucData[mes][code] = {
@@ -947,14 +945,21 @@ async function processFiles() {
     }
 
     const setores = [];
+    // Identidade (nome/regional/distrital/linha) SEMPRE do mês mais recente que
+    // contém o código. Percorre do mês mais novo para o mais antigo: o primeiro
+    // match é o mês atual. Evita exibir o ocupante antigo de um setor reatribuído
+    // ou que virou VAGO (ex.: 501004 é Carla hoje, não Rafaela; 502001 está VAGO,
+    // não Everton). allCodes já vem só do último mês, então o último mês sempre tem
+    // o código; a varredura para trás só serve de fallback defensivo.
+    const mesesDesc = sortedMeses.slice().reverse();
     for (const code of allCodes) {
-      // Get nome/reg/dist from any month
+      // nome/reg/dist do mês mais recente que tiver o código
       let nome = '', reg = '', dist = '';
-      for (const m of sortedMeses) {
+      for (const m of mesesDesc) {
         if (lucData[m][code]) { nome = lucData[m][code].nome; reg = lucData[m][code].reg; dist = lucData[m][code].dist; break; }
       }
       let linha = '';
-      for (const m of sortedMeses) {
+      for (const m of mesesDesc) {
         if (lucData[m][code]?.linha) { linha = lucData[m][code].linha; break; }
       }
       const s = { code, nome, regional: reg, distrital: dist, linha };
