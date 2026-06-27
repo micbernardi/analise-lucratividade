@@ -230,9 +230,10 @@ input[type=text] {
 }
 
 .ctab.t-all {
-  background: var(--bs);
+  background: var(--blue);
   border-color: var(--blue);
-  color: var(--blue)
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(45, 59, 140, .35)
 }
 
 /* ── Botão especial: "Faixas de Luc%" se destaca dos demais agrupamentos ── */
@@ -252,22 +253,27 @@ input[type=text] {
 }
 
 .ctab.t-s {
-  background: var(--gs);
+  background: var(--green);
   border-color: var(--green);
-  color: var(--green)
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(26, 107, 63, .35)
 }
 
 .ctab.t-a {
-  background: var(--ys);
+  background: var(--yellow);
   border-color: var(--yellow);
-  color: var(--yellow)
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(161, 98, 7, .35)
 }
 
 .ctab.t-c {
-  background: var(--rs);
+  background: var(--red);
   border-color: var(--red);
-  color: var(--red)
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(168, 28, 28, .35)
 }
+
+.ctab.t-s .d6, .ctab.t-a .d6, .ctab.t-c .d6 { background: #fff }
 
 .ctab.t-neg {
   background: #fff0f0;
@@ -2156,8 +2162,15 @@ thead tr:not(.thead-groups) th {
   box-shadow: 0 3px 10px rgba(0, 0, 0, .08)
 }
 .tfx.active {
-  box-shadow: 0 0 0 2px var(--navy) inset
+  background: var(--navy);
+  border-color: var(--navy);
+  transform: translateY(-1px);
+  box-shadow: 0 5px 16px rgba(30, 58, 95, .42)
 }
+.tfx.active::after { width: 5px }
+.tfx.active .tfx-v,
+.tfx.active .tfx-l,
+.tfx.active .tfx-p { color: #fff }
 .tfx-v {
   font-family: var(--ff);
   font-weight: 800;
@@ -2981,7 +2994,15 @@ thead tr:not(.thead-groups) th {
 .tend-sum.tb-sem::after { background: var(--red); }
 .tend-sum.tb-ins::after { background: var(--muted); }
 .tend-sum:hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(0,0,0,.08); }
-.tend-sum.active { box-shadow: 0 0 0 2px var(--navy) inset; }
+.tend-sum.active {
+  background: var(--navy);
+  border-color: var(--navy);
+  transform: translateY(-1px);
+  box-shadow: 0 5px 16px rgba(30, 58, 95, .42);
+}
+.tend-sum.active::after { width: 4px; }
+.tend-sum.active .ts-v { color: #fff !important; }
+.tend-sum.active .ts-l { color: rgba(255, 255, 255, .85); }
 .tend-sum .ts-v { font-family: var(--ff); font-weight: 800; font-size: 15px; line-height: 1; flex-shrink: 0; }
 .tend-sum .ts-l { font-size: 9px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 
