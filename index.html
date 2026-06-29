@@ -35,7 +35,7 @@
     <div class="hcounts">
       <div class="hc">
         <div class="hc-v" id="h-tot" style="color:var(--muted2)">—</div>
-        <div class="hc-l">Setores</div>
+        <div class="hc-l" id="h-tot-l">Setores</div>
       </div>
       <div class="hc">
         <div class="hc-v" style="color:var(--green)" id="h-s">—</div>
@@ -78,6 +78,12 @@
           <option value="">Todas</option>
         </select>
       </div>
+      <div class="fg"><label>Visão</label>
+        <select id="f-nivel" onchange="geralSetNivel(this.value)">
+          <option value="setor">Por setor (PV)</option>
+          <option value="gd">Por GD (distrital)</option>
+        </select>
+      </div>
       <div class="fg"><label>Distrital</label>
         <select id="f-dist" onchange="applyFilters()">
           <option value="">Todas</option>
@@ -116,12 +122,8 @@
           </div>
         </div>
       </div>
-      <div class="fsep"></div>
-      <div class="fg"><label>Buscar</label>
-        <input type="text" id="f-search" placeholder="Nome ou código..." oninput="applyFilters()">
-      </div>
       <button class="flt-clear" onclick="clearGeralFiltros()" style="margin-left:auto"
-        title="Limpar Regional, Distrital, Meses neg., Share, Linha, Busca, status e os filtros de KPI">Limpar Filtros</button>
+        title="Limpar Regional, Distrital, Meses neg., Share, Linha, status e os filtros de KPI">Limpar Filtros</button>
     </div>
     <div class="fbar-row">
       <div class="ctabs">
@@ -222,7 +224,7 @@
     <!-- TABLE -->
     <div class="twrap" id="twrap" style="display:none">
       <div class="thdr">
-        <h2>Setores</h2><span class="tcnt" id="tcnt">—</span>
+        <h2 id="sec-setores-title">Setores</h2><span class="tcnt" id="tcnt">—</span>
       </div>
       <div class="tscroll" id="tscroll">
         <table>

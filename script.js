@@ -30,6 +30,8 @@ let filtered = [], sortCol = 'classificacao', sortDir = 1, page = 0;
 const PS = 100;
 let activeTab = '', kpiF = '', viewM = 'ABR', negFilter = false, virouFilter = false, virouPosFilter = false;
 let linhaVal = '';
+let geralNivel = 'setor';   // 'setor' = uma linha por PV | 'gd' = uma linha por distrital (agregado)
+let _geralGD = [];          // cache da agregação por distrital do filtro atual
 
 function toggleLinhaDd(e) {
   e.stopPropagation();
@@ -353,12 +355,14 @@ function getBase() {
   const dist = document.getElementById('f-dist').value;
   const neg = parseInt(document.getElementById('f-neg').value) || 0;
   const share = document.getElementById('f-share').value;
-  const srch = document.getElementById('f-search').value.toLowerCase().trim();
+  const srchEl = document.getElementById('f-search');
+  const srch = srchEl ? srchEl.value.toLowerCase().trim() : '';
   const prevM = (() => {
     const idx = activeMeses.indexOf(viewM);
     return idx > 0 ? activeMeses[idx - 1] : null;
   })();
-  return SETORES.filter(s => {
+  const src = geralNivel === 'gd' ? _geralGD : SETORES;
+  return src.filter(s => {
     if (activeTab && s.classificacao !== activeTab) return false;
     if (negFilter && (s['luc_' + viewM] == null || s['luc_' + viewM] >= 0)) return false;
     if (linhaVal && s.linha !== linhaVal) return false;
@@ -384,6 +388,7 @@ function getBase() {
 }
 
 function applyFilters() {
+  _geralGD = (geralNivel === 'gd') ? geralDistritais() : [];   // congela a agregação deste filtro
   const base = getBase();
   filtered = base.filter(s => {
     if (kpiF && s.sub_class !== kpiF && !(kpiF === 'Saudável' && s.sub_class === 'Excelente')) return false;
@@ -409,8 +414,11 @@ function sortBy(col) {
   else { sortCol = col; sortDir = col === 'nome' ? 1 : -1; }
   applyFilters();
 }
+// Visão da aba Geral: por setor (PV) ou por GD (distrital agregado).
+function geralSetNivel(v) { geralNivel = (v === 'gd') ? 'gd' : 'setor'; applyFilters(); }
 
 function updateHdr(base) {
+  const htl = document.getElementById('h-tot-l'); if (htl) htl.textContent = geralNivel === 'gd' ? 'Distritais' : 'Setores';
   document.getElementById('h-tot').textContent = base.length;
   document.getElementById('h-s').textContent = base.filter(x => x.sub_class === 'Saudável' || x.sub_class === 'Excelente').length;
   document.getElementById('h-est').textContent = 0;
@@ -463,9 +471,12 @@ function updateKPIs(base) {
 function renderTable() {
   const tbody = document.getElementById('tbody');
   const slice = filtered.slice(page * PS, (page + 1) * PS);
-  document.getElementById('tcnt').textContent = `${filtered.length} setores`;
+  const noun = geralNivel === 'gd' ? 'distrital' : 'setor';
+  const nounPl = geralNivel === 'gd' ? 'distritais' : 'setores';
+  const st = document.getElementById('sec-setores-title'); if (st) st.textContent = geralNivel === 'gd' ? 'Distritais' : 'Setores';
+  document.getElementById('tcnt').textContent = `${filtered.length} ${filtered.length === 1 ? noun : nounPl}`;
   if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="11"><div class="empty">📊 Nenhum setor encontrado.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11"><div class="empty">📊 Nenhum ${noun} encontrado.</div></td></tr>`;
     renderPag(); return;
   }
 
@@ -3008,82 +3019,118 @@ function tendBE(s) {
 // Respeita o filtro de Linha na soma (PRIME/INFINITY); Regional/Distrital/Faixa/
 // Busca/momentum filtram os cards resultantes, igual à visão por setor.
 const TEND_PREFIXES = ['trm', 'ytd', 'mat', 'abrabr'];
+// Agrega um conjunto de setores num único objeto "distrital", somando SEMPRE os
+// absolutos e recalculando as razões (nunca a média de percentuais). Compartilhado
+// pelas visões por GD da Tendência e da Geral. O agrupamento por Linha e o valor de
+// o.linha ficam a cargo de quem chama (tendLinha na Tendência, linhaVal na Geral).
+function _aggDistrital(setores, d, lastM, linha) {
+  const o = {
+    _isGD: true, _nSetores: setores.length,
+    code: d, distrital: d, regional: setores[0].regional,
+    regional_nome: setores[0].regional_nome, distrital_nome: setores[0].distrital_nome,
+    nome: setores[0].distrital_nome || d, linha: linha || ''
+  };
+
+  // 1) Variações por período: soma absolutos (ant/atual) e recalcula a variação.
+  TEND_PREFIXES.forEach(p => {
+    let sa = 0, sc = 0, ma = 0, mc = 0, hasSup = false, hasMerc = false;
+    setores.forEach(s => {
+      if (s[p + '_sup_ant'] != null && s[p + '_sup_atual'] != null) { sa += s[p + '_sup_ant']; sc += s[p + '_sup_atual']; hasSup = true; }
+      if (s[p + '_merc_ant'] != null && s[p + '_merc_atual'] != null) { ma += s[p + '_merc_ant']; mc += s[p + '_merc_atual']; hasMerc = true; }
+    });
+    if (hasSup) { o[p + '_sup_ant'] = sa; o[p + '_sup_atual'] = sc; o[p + '_sup_var'] = sa !== 0 ? (sc - sa) / sa : null; }
+    if (hasMerc) { o[p + '_merc_ant'] = ma; o[p + '_merc_atual'] = mc; o[p + '_merc_var'] = ma !== 0 ? (mc - ma) / ma : null; }
+    if (hasSup && hasMerc && ma !== 0 && mc !== 0) {
+      o[p + '_share_ant'] = sa / ma; o[p + '_share_atual'] = sc / mc;
+      o[p + '_share_var'] = o[p + '_share_ant'] !== 0 ? (o[p + '_share_atual'] - o[p + '_share_ant']) / o[p + '_share_ant'] : null;
+    }
+  });
+
+  // 2) Lucratividade por mês: Σlucro / Σvenda líquida (ponderada, igual à oficial).
+  activeMeses.forEach(m => {
+    let lucro = 0, venda = 0, supytd = 0, hL = false, hV = false, hS = false;
+    setores.forEach(s => {
+      if (s['lucro_' + m] != null) { lucro += s['lucro_' + m]; hL = true; }
+      if (s['venda_ytd_' + m] != null) { venda += s['venda_ytd_' + m]; hV = true; }
+      if (s['sup_ytd_' + m] != null) { supytd += s['sup_ytd_' + m]; hS = true; }
+    });
+    if (hL) o['lucro_' + m] = lucro;
+    if (hV) o['venda_ytd_' + m] = venda;
+    if (hS) o['sup_ytd_' + m] = supytd;
+    o['luc_' + m] = (hV && venda !== 0) ? lucro / venda : null;
+  });
+
+  // 3) PPP atual (base de venda média): soma ytd_sup_atual.
+  let ppp = 0, hP = false;
+  setores.forEach(s => { if (s.ytd_sup_atual != null) { ppp += s.ytd_sup_atual; hP = true; } });
+  if (hP) o.ytd_sup_atual = ppp;
+  o.venda_media = (hP && activeMeses.length) ? ppp / activeMeses.length : null;
+
+  // 4) MC% agregada = média ponderada pela venda líquida (= 1 − Σdespvar/Σvenda).
+  let mcNum = 0, mcDen = 0;
+  setores.forEach(s => { const v = s['venda_ytd_' + lastM]; if (s.mc_pct != null && v != null && v > 0) { mcNum += s.mc_pct * v; mcDen += v; } });
+  o.mc_pct = mcDen > 0 ? mcNum / mcDen : null;
+
+  // 5) Equilíbrio agregado: soma o break-even de cada setor (alvo, atual, líquido).
+  let curMes = 0, alvoMes = 0, alvoLiq = 0, anyBE = false; const bases = new Set();
+  setores.forEach(s => {
+    const b = tendBE(s);
+    if (b) { curMes += b.curMes; alvoMes += b.alvoMes; alvoLiq += b.alvoLiq; anyBE = true; if (b.base) bases.add(b.base); }
+  });
+  o._be = anyBE ? {
+    curMes, alvoMes, gap: alvoMes - curMes, alvoLiq,
+    lucPct: o['luc_' + lastM] != null ? o['luc_' + lastM] * 100 : null,
+    folga: alvoMes > 0 ? ((curMes - alvoMes) / alvoMes) * 100 : null,
+    base: bases.size === 1 ? [...bases][0] : (bases.size ? 'mix' : null), fallback: false, lastM
+  } : null;
+  o.folga_pe = o._be ? o._be.folga : null;
+
+  // 6) n_neg: nº de meses com lucratividade negativa (filtro "Meses neg." da Geral).
+  o.n_neg = activeMeses.filter(m => (o['luc_' + m] || 0) < 0).length;
+
+  // 7) Classificação de status (mesma regra do parser, aplicada sobre o agregado):
+  //    Saudável (PE≥8%) · Atenção (PE 4–8%, ou PE 0–4% acima do mercado) ·
+  //    ALERTA (PE 0–4% abaixo, ou PE neg. acima) · Crítico (PE neg. abaixo).
+  const PE_SAUDAVEL = 8, PE_INTERMEDIARIO = 4, fpe = o.folga_pe;
+  let saudavel_fin, intermediario_fin, fragil_fin;
+  if (fpe != null) {
+    saudavel_fin = fpe >= PE_SAUDAVEL;
+    intermediario_fin = fpe >= PE_INTERMEDIARIO && fpe < PE_SAUDAVEL;
+    fragil_fin = fpe < PE_INTERMEDIARIO;
+  } else {
+    const lf = o['luc_' + lastM] || 0;
+    saudavel_fin = lf >= 0.05; intermediario_fin = lf >= 0.02 && lf < 0.05; fragil_fin = lf < 0.02;
+  }
+  const acima_merc = (o.ytd_sup_var || 0) >= (o.ytd_merc_var || 0);
+  if (saudavel_fin) { o.classificacao = 'Saudável'; o.sub_class = 'Saudável'; }
+  else if (intermediario_fin) { o.classificacao = 'Atenção'; o.sub_class = 'Atenção'; }
+  else if (fragil_fin && fpe >= 0 && acima_merc) { o.classificacao = 'Atenção'; o.sub_class = 'Atenção'; }
+  else if (fragil_fin && fpe >= 0 && !acima_merc) { o.classificacao = 'Atenção'; o.sub_class = 'ALERTA'; }
+  else if (fpe < 0 && acima_merc) { o.classificacao = 'Atenção'; o.sub_class = 'ALERTA'; }
+  else { o.classificacao = 'Crítico'; o.sub_class = 'Crítico'; }
+
+  return o;
+}
 function tendDistritais() {
   const groups = {};
   SETORES.forEach(s => {
     if (tendLinha && s.linha !== tendLinha) return;      // filtro de Linha entra na soma
-    const d = s.distrital;
-    if (d == null || d === '') return;
+    const d = s.distrital; if (d == null || d === '') return;
     (groups[d] || (groups[d] = [])).push(s);
   });
   const lastM = activeMeses[activeMeses.length - 1];
-  const out = [];
-  Object.keys(groups).forEach(d => {
-    const setores = groups[d];
-    const o = {
-      _isGD: true, _nSetores: setores.length,
-      code: d, distrital: d, regional: setores[0].regional,
-      regional_nome: setores[0].regional_nome, distrital_nome: setores[0].distrital_nome,
-      nome: setores[0].distrital_nome || d, linha: tendLinha || ''
-    };
-
-    // 1) Variações por período: soma absolutos (ant/atual) e recalcula a variação.
-    TEND_PREFIXES.forEach(p => {
-      let sa = 0, sc = 0, ma = 0, mc = 0, hasSup = false, hasMerc = false;
-      setores.forEach(s => {
-        if (s[p + '_sup_ant'] != null && s[p + '_sup_atual'] != null) { sa += s[p + '_sup_ant']; sc += s[p + '_sup_atual']; hasSup = true; }
-        if (s[p + '_merc_ant'] != null && s[p + '_merc_atual'] != null) { ma += s[p + '_merc_ant']; mc += s[p + '_merc_atual']; hasMerc = true; }
-      });
-      if (hasSup) { o[p + '_sup_ant'] = sa; o[p + '_sup_atual'] = sc; o[p + '_sup_var'] = sa !== 0 ? (sc - sa) / sa : null; }
-      if (hasMerc) { o[p + '_merc_ant'] = ma; o[p + '_merc_atual'] = mc; o[p + '_merc_var'] = ma !== 0 ? (mc - ma) / ma : null; }
-      if (hasSup && hasMerc && ma !== 0 && mc !== 0) {
-        o[p + '_share_ant'] = sa / ma; o[p + '_share_atual'] = sc / mc;
-        o[p + '_share_var'] = o[p + '_share_ant'] !== 0 ? (o[p + '_share_atual'] - o[p + '_share_ant']) / o[p + '_share_ant'] : null;
-      }
-    });
-
-    // 2) Lucratividade por mês: Σlucro / Σvenda líquida (ponderada, igual à oficial).
-    activeMeses.forEach(m => {
-      let lucro = 0, venda = 0, supytd = 0, hL = false, hV = false, hS = false;
-      setores.forEach(s => {
-        if (s['lucro_' + m] != null) { lucro += s['lucro_' + m]; hL = true; }
-        if (s['venda_ytd_' + m] != null) { venda += s['venda_ytd_' + m]; hV = true; }
-        if (s['sup_ytd_' + m] != null) { supytd += s['sup_ytd_' + m]; hS = true; }
-      });
-      if (hL) o['lucro_' + m] = lucro;
-      if (hV) o['venda_ytd_' + m] = venda;
-      if (hS) o['sup_ytd_' + m] = supytd;
-      o['luc_' + m] = (hV && venda !== 0) ? lucro / venda : null;
-    });
-
-    // 3) PPP atual (base de venda média): soma ytd_sup_atual.
-    let ppp = 0, hP = false;
-    setores.forEach(s => { if (s.ytd_sup_atual != null) { ppp += s.ytd_sup_atual; hP = true; } });
-    if (hP) o.ytd_sup_atual = ppp;
-    o.venda_media = (hP && activeMeses.length) ? ppp / activeMeses.length : null;
-
-    // 4) MC% agregada = média ponderada pela venda líquida (= 1 − Σdespvar/Σvenda).
-    let mcNum = 0, mcDen = 0;
-    setores.forEach(s => { const v = s['venda_ytd_' + lastM]; if (s.mc_pct != null && v != null && v > 0) { mcNum += s.mc_pct * v; mcDen += v; } });
-    o.mc_pct = mcDen > 0 ? mcNum / mcDen : null;
-
-    // 5) Equilíbrio agregado: soma o break-even de cada setor (alvo, atual, líquido).
-    let curMes = 0, alvoMes = 0, alvoLiq = 0, anyBE = false; const bases = new Set();
-    setores.forEach(s => {
-      const b = tendBE(s);
-      if (b) { curMes += b.curMes; alvoMes += b.alvoMes; alvoLiq += b.alvoLiq; anyBE = true; if (b.base) bases.add(b.base); }
-    });
-    o._be = anyBE ? {
-      curMes, alvoMes, gap: alvoMes - curMes, alvoLiq,
-      lucPct: o['luc_' + lastM] != null ? o['luc_' + lastM] * 100 : null,
-      folga: alvoMes > 0 ? ((curMes - alvoMes) / alvoMes) * 100 : null,
-      base: bases.size === 1 ? [...bases][0] : (bases.size ? 'mix' : null), fallback: false, lastM
-    } : null;
-    o.folga_pe = o._be ? o._be.folga : null;
-
-    out.push(o);
+  return Object.keys(groups).map(d => _aggDistrital(groups[d], d, lastM, tendLinha));
+}
+// Mesma agregação para a aba Geral (usa o filtro de Linha próprio, linhaVal).
+function geralDistritais() {
+  const groups = {};
+  SETORES.forEach(s => {
+    if (linhaVal && s.linha !== linhaVal) return;
+    const d = s.distrital; if (d == null || d === '') return;
+    (groups[d] || (groups[d] = [])).push(s);
   });
-  return out;
+  const lastM = activeMeses[activeMeses.length - 1];
+  return Object.keys(groups).map(d => _aggDistrital(groups[d], d, lastM, linhaVal));
 }
 // Itens da visão atual: setores (PV) ou distritais (GD).
 function tendItems() { return tendNivel === 'gd' ? _tendGD : SETORES; }
@@ -3362,7 +3409,7 @@ function tendLimparFiltros() {
 // Mantém o mês selecionado, que é escopo de dados.
 function clearGeralFiltros() {
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
-  set('f-reg', ''); set('f-neg', ''); set('f-share', ''); set('f-search', '');
+  set('f-reg', ''); set('f-neg', ''); set('f-share', '');
   linhaVal = '';
   const ll = document.getElementById('linha-dd-label'); if (ll) ll.textContent = 'Todas';
   sharedReg = ''; sharedDist = '';
