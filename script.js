@@ -16,6 +16,7 @@ let BRASIL_LUC = {}, GR_LUC = {}, GD_LUC = {};
 const MESES = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
 const MESES_PTBR = { JAN: 'JANEIRO', FEV: 'FEVEREIRO', MAR: 'MARÇO', ABR: 'ABRIL', MAI: 'MAIO', JUN: 'JUNHO', JUL: 'JULHO', AGO: 'AGOSTO', SET: 'SETEMBRO', OUT: 'OUTUBRO', NOV: 'NOVEMBRO', DEZ: 'DEZEMBRO' };
 let activeMeses = []; // months actually in the data
+let PERIODO_ANO = '2026'; // ano do cabeçalho; detectado dos nomes dos arquivos quando possível
 let DESEMP_BY_MES = {}; // desempenho data keyed by month: { JAN: {code: {...}}, FEV: {...}, ... }
 
 // Base de preço bruto usada no painel de Equilíbrio mensal:
@@ -150,6 +151,11 @@ function loadDataset(parsed) {
   DESEMP_BY_MES = parsed.desemp_by_mes || {};
   T_CRIT_INFO = parsed.t_crit || T_CRIT_INFO || null;
   activeMeses = parsed.meses || ['JAN', 'FEV', 'MAR', 'ABR'];
+  // Ano do cabeçalho: usa o ano dos nomes das planilhas se houver um único; senão mantém o atual.
+  {
+    const yrs = [...new Set(((parsed.sourceFiles || []).join(' ').match(/\b20\d{2}\b/g)) || [])];
+    if (yrs.length === 1) PERIODO_ANO = yrs[0];
+  }
   viewM = activeMeses[activeMeses.length - 1]; // default to latest month
 
   if (!SETORES.length) { showNoData(); return; }
@@ -207,6 +213,7 @@ function loadDataset(parsed) {
 
   // Sync month buttons to activeMeses
   syncMonthButtons();
+  atualizarPeriodo();     // subtítulo do período conforme os meses carregados
 
   // ── Restaura apenas Regional/Distrital (compartilhado entre as visões) ──
   loadSavedFilters();
@@ -216,6 +223,16 @@ function loadDataset(parsed) {
   _persistReady = true;   // a partir daqui, mudanças de Regional/Distrital são salvas
 }
 
+// Atualiza o subtítulo do período (ex.: "JAN–MAI 2026") conforme os meses das
+// planilhas carregadas. Mês único mostra só o mês; vários, o intervalo primeiro–último.
+function atualizarPeriodo() {
+  const el = document.getElementById('hdr-period');
+  if (!el) return;
+  const ms = MESES.filter(m => activeMeses.includes(m));   // em ordem de calendário
+  if (!ms.length) return;
+  const range = ms.length === 1 ? ms[0] : `${ms[0]}–${ms[ms.length - 1]}`;
+  el.textContent = `${range} ${PERIODO_ANO}`;
+}
 function syncMonthButtons() {
   const msel = document.querySelector('.msel');
   // Remove old month buttons
