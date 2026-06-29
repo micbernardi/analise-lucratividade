@@ -154,6 +154,7 @@ body {
 
 .fbar-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center
 }
@@ -2214,6 +2215,28 @@ thead tr:not(.thead-groups) th {
   margin: 2px 3px;
   align-self: stretch
 }
+/* Botão Limpar Filtros (barras de filtro de todas as abas) */
+.flt-clear {
+  font-family: var(--ff);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--navy);
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: .12s
+}
+.flt-clear:hover {
+  background: var(--navy);
+  border-color: var(--navy);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(30, 58, 95, .3)
+}
+.flt-clear:active { transform: translateY(0) }
 
 /* selo de faixa dentro do card do setor */
 .tc-faixa {

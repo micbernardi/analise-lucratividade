@@ -120,6 +120,8 @@
       <div class="fg"><label>Buscar</label>
         <input type="text" id="f-search" placeholder="Nome ou código..." oninput="applyFilters()">
       </div>
+      <button class="flt-clear" onclick="clearGeralFiltros()" style="margin-left:auto"
+        title="Limpar Regional, Distrital, Meses neg., Share, Linha, Busca, status e os filtros de KPI">Limpar Filtros</button>
     </div>
     <div class="fbar-row">
       <div class="ctabs">
@@ -450,6 +452,8 @@
           </div>
           <div class="msel" id="luc-msel" style="margin-left:0"></div>
         </div>
+        <button class="flt-clear" onclick="clearLucFiltros()"
+          title="Limpar Regional, Distrital, Linha, Faixa, Busca e os toggles">Limpar Filtros</button>
       </div>
       <div class="fbar-row">
         <div class="luc-legend">
@@ -577,8 +581,10 @@
         <div class="fg"><label>Buscar</label>
           <input type="text" id="tf-search" placeholder="Nome ou código..." oninput="tendApply()">
         </div>
+        <button class="flt-clear" onclick="tendLimparFiltros()" style="margin-left:auto"
+          title="Limpar Regional, Distrital, Linha, Faixa, Busca e o filtro de momentum">Limpar Filtros</button>
         <span id="tend-count"
-          style="margin-left:auto;font-size:10px;color:var(--muted);font-weight:700;white-space:nowrap"></span>
+          style="font-size:10px;color:var(--muted);font-weight:700;white-space:nowrap;margin-left:12px"></span>
       </div>
     </div>
 

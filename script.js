@@ -3343,6 +3343,49 @@ function tendFillDist() {
   fd.value = '';
 }
 function tendApply() { tendDist = document.getElementById('tf-dist').value; tendSearch = document.getElementById('tf-search').value; tendSort = document.getElementById('tf-sort').value; renderTend(); }
+// Limpa os filtros desta aba: Regional, Distrital, Linha, Faixa, Busca e o bucket
+// de momentum. Mantém Visão (setor/GD) e Ordenação, que são modos de exibição, não
+// filtros. Regional/Distrital são globais e persistidos: reseta os selects ANTES de
+// salvar, para captureRegDist (dentro de saveFilters) gravar o estado já zerado.
+function tendLimparFiltros() {
+  tendReg = ''; tendDist = ''; tendLinha = '';
+  tendFaixaFilter = ''; tendSearch = ''; tendBucket = '';
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+  set('tf-reg', ''); set('tf-linha', ''); set('tf-faixa', ''); set('tf-search', '');
+  tendFillDist();          // Regional vazio -> repopula Distrital e zera a seleção
+  sharedReg = ''; sharedDist = '';
+  saveFilters();           // agora captura tf-reg/tf-dist já zerados
+  renderTend();
+}
+// Limpa os filtros da aba Geral: Regional, Distrital, Meses neg., Share, Linha,
+// Busca, abas de status, filtro por card KPI e os toggles (Negativos/Virou).
+// Mantém o mês selecionado, que é escopo de dados.
+function clearGeralFiltros() {
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+  set('f-reg', ''); set('f-neg', ''); set('f-share', ''); set('f-search', '');
+  linhaVal = '';
+  const ll = document.getElementById('linha-dd-label'); if (ll) ll.textContent = 'Todas';
+  sharedReg = ''; sharedDist = '';
+  onRegChange();           // Regional vazio -> repopula Distrital + render
+  clearKpi();              // zera filtro por card KPI + banner
+  const todos = document.querySelector('.ctabs .ctab');
+  if (todos) setTab('', todos);   // zera abas de status + toggles (render final)
+  saveFilters();           // persiste Regional/Distrital zerados
+}
+// Limpa os filtros da aba Lucratividade: Regional, Distrital, Linha, Faixa, Busca e
+// os toggles (Negativos/Virou). Mantém os meses selecionados (escopo de dados).
+function clearLucFiltros() {
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+  set('lf-reg', ''); set('lf-search', '');
+  lucLinhaVal = '';
+  const ll = document.getElementById('luc-linha-dd-label'); if (ll) ll.textContent = 'Todas';
+  lucFaixaFilter = '';
+  sharedReg = ''; sharedDist = '';
+  onLucRegChange();        // Regional vazio -> repopula Distrital + render
+  setLucFilters(false, false, false);   // zera toggles + visual
+  saveFilters();           // persiste Regional/Distrital zerados
+  renderLuc();
+}
 function tendSyncFilters() {
   const r = document.getElementById('tf-reg'); r.innerHTML = '<option value="">Todas</option>';
   Object.entries(REGIONAIS).forEach(([code, name]) => { const o = document.createElement('option'); o.value = code; o.textContent = name; r.appendChild(o); });
