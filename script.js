@@ -3389,7 +3389,7 @@ function tendFillDist() {
   });
   fd.value = '';
 }
-function tendApply() { tendDist = document.getElementById('tf-dist').value; tendSearch = document.getElementById('tf-search').value; tendSort = document.getElementById('tf-sort').value; renderTend(); }
+function tendApply() { tendDist = document.getElementById('tf-dist').value; const se = document.getElementById('tf-search'); tendSearch = se ? se.value : ''; tendSort = document.getElementById('tf-sort').value; renderTend(); }
 // Limpa os filtros desta aba: Regional, Distrital, Linha, Faixa, Busca e o bucket
 // de momentum. Mantém Visão (setor/GD) e Ordenação, que são modos de exibição, não
 // filtros. Regional/Distrital são globais e persistidos: reseta os selects ANTES de
@@ -3398,7 +3398,7 @@ function tendLimparFiltros() {
   tendReg = ''; tendDist = ''; tendLinha = '';
   tendFaixaFilter = ''; tendSearch = ''; tendBucket = '';
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
-  set('tf-reg', ''); set('tf-linha', ''); set('tf-faixa', ''); set('tf-search', '');
+  set('tf-reg', ''); set('tf-linha', '');
   tendFillDist();          // Regional vazio -> repopula Distrital e zera a seleção
   sharedReg = ''; sharedDist = '';
   saveFilters();           // agora captura tf-reg/tf-dist já zerados

@@ -567,26 +567,10 @@
             <option value="fat">Faturamento (maior → menor)</option>
           </select>
         </div>
-        <div class="fsep"></div>
-        <div class="fg"><label>Faixa lucr.%</label>
-          <select id="tf-faixa" onchange="tendSetFaixa(this.value)">
-            <option value="">Todas</option>
-            <option value="pos">Positivos (todas)</option>
-            <option value="f1">De 0,1% a 5%</option>
-            <option value="f2">De 5% a 10%</option>
-            <option value="f3">De 10,1% até 13,3%</option>
-            <option value="f4">Acima de 13,4%</option>
-            <option value="neg">Negativos</option>
-          </select>
-        </div>
-        <div class="fsep"></div>
-        <div class="fg"><label>Buscar</label>
-          <input type="text" id="tf-search" placeholder="Nome ou código..." oninput="tendApply()">
-        </div>
-        <button class="flt-clear" onclick="tendLimparFiltros()" style="margin-left:auto"
-          title="Limpar Regional, Distrital, Linha, Faixa, Busca e o filtro de momentum">Limpar Filtros</button>
+        <button class="flt-clear" onclick="tendLimparFiltros()"
+          title="Limpar Regional, Distrital, Linha e o filtro de momentum">Limpar Filtros</button>
         <span id="tend-count"
-          style="font-size:10px;color:var(--muted);font-weight:700;white-space:nowrap;margin-left:12px"></span>
+          style="font-size:10px;color:var(--muted);font-weight:700;white-space:nowrap"></span>
       </div>
     </div>
 
