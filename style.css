@@ -2204,6 +2204,7 @@ thead tr:not(.thead-groups) th {
 .tfx-f3::after  { background: var(--blue) }
 .tfx-f4::after  { background: var(--green) }
 .tfx-f4 { background: #e6f4ec }
+.tfx-todos::after { background: var(--navy) }
 .tfx-pos::after { background: var(--navy) }
 .tfx-neg::after { background: var(--red) }
 .tfx-div {

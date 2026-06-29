@@ -1677,6 +1677,8 @@ function renderLucFaixas(rows) {
       <div class="tfx-meta"><div class="tfx-l">${label}</div><div class="tfx-p">${p}</div></div>
     </div>`;
   bar.innerHTML =
+    chip('', 'Todos', ttGeral, pct(ttGeral, ttGeral), 'tfx-todos') +
+    `<span class="tfx-div"></span>` +
     chip('f1', '0,1–5%', cnt.f1, pct(cnt.f1, ttPos), 'tfx-f1') +
     chip('f2', '5–10%', cnt.f2, pct(cnt.f2, ttPos), 'tfx-f2') +
     chip('f3', '10,1–13,3%', cnt.f3, pct(cnt.f3, ttPos), 'tfx-f3') +
@@ -2835,6 +2837,8 @@ function closeLegendIfBg(e) {
 //                       sup_ytd_M, luc_M, folga_pe.
 // ═══════════════════════════════════════════════════════════════════════════
 let tendReg = '', tendDist = '', tendLinha = '', tendSearch = '', tendBucket = '', tendSort = 'gap';
+let tendNivel = 'setor';   // 'setor' = um card por PV | 'gd' = um card por distrital (agregado)
+let _tendGD = [];          // cache da agregação por distrital do render atual
 let tendFaixaFilter = ''; // '' | 'pos' | 'f1' | 'f2' | 'f3' | 'f4' | 'neg'
 const T_BAND = 1.5; // pp — banda de estabilidade do tendência
 
@@ -2972,6 +2976,7 @@ function tendMom(s) {
 // Convertendo pela razão líquido/bruto do próprio setor:  alvo_bruto = bruto_YTD / (1+folga/100).
 // A base do bruto (PL da lucratividade ou PPP do desempenho) segue BASE_EQUILIBRIO.
 function tendBE(s) {
+  if (s._isGD) return s._be || null;   // distrital: equilíbrio já agregado (soma dos setores)
   const lastM = activeMeses[activeMeses.length - 1];
   const nM = activeMeses.length, folga = s.folga_pe;
   if (folga == null || nM < 1) return null;
@@ -2995,7 +3000,96 @@ function tendBE(s) {
   };
 }
 
-// ── Mini-escada de tendência (3 barras: TRI no topo → MAT na base) ─────────────
+// ── VISÃO POR GD (DISTRITAL): agrega os setores num card por distrital ────────
+// Soma SEMPRE os valores absolutos e recalcula as razões — nunca a média de
+// percentuais. Variações por período: Σatual e Σant por distrital, variação =
+// (Σatual−Σant)/Σant. Lucratividade: Σlucro/Σvenda líquida. Equilíbrio: soma o
+// break-even de cada setor (alvo e atual em R$), exatamente como se fosse um só.
+// Respeita o filtro de Linha na soma (PRIME/INFINITY); Regional/Distrital/Faixa/
+// Busca/momentum filtram os cards resultantes, igual à visão por setor.
+const TEND_PREFIXES = ['trm', 'ytd', 'mat', 'abrabr'];
+function tendDistritais() {
+  const groups = {};
+  SETORES.forEach(s => {
+    if (tendLinha && s.linha !== tendLinha) return;      // filtro de Linha entra na soma
+    const d = s.distrital;
+    if (d == null || d === '') return;
+    (groups[d] || (groups[d] = [])).push(s);
+  });
+  const lastM = activeMeses[activeMeses.length - 1];
+  const out = [];
+  Object.keys(groups).forEach(d => {
+    const setores = groups[d];
+    const o = {
+      _isGD: true, _nSetores: setores.length,
+      code: d, distrital: d, regional: setores[0].regional,
+      regional_nome: setores[0].regional_nome, distrital_nome: setores[0].distrital_nome,
+      nome: setores[0].distrital_nome || d, linha: tendLinha || ''
+    };
+
+    // 1) Variações por período: soma absolutos (ant/atual) e recalcula a variação.
+    TEND_PREFIXES.forEach(p => {
+      let sa = 0, sc = 0, ma = 0, mc = 0, hasSup = false, hasMerc = false;
+      setores.forEach(s => {
+        if (s[p + '_sup_ant'] != null && s[p + '_sup_atual'] != null) { sa += s[p + '_sup_ant']; sc += s[p + '_sup_atual']; hasSup = true; }
+        if (s[p + '_merc_ant'] != null && s[p + '_merc_atual'] != null) { ma += s[p + '_merc_ant']; mc += s[p + '_merc_atual']; hasMerc = true; }
+      });
+      if (hasSup) { o[p + '_sup_ant'] = sa; o[p + '_sup_atual'] = sc; o[p + '_sup_var'] = sa !== 0 ? (sc - sa) / sa : null; }
+      if (hasMerc) { o[p + '_merc_ant'] = ma; o[p + '_merc_atual'] = mc; o[p + '_merc_var'] = ma !== 0 ? (mc - ma) / ma : null; }
+      if (hasSup && hasMerc && ma !== 0 && mc !== 0) {
+        o[p + '_share_ant'] = sa / ma; o[p + '_share_atual'] = sc / mc;
+        o[p + '_share_var'] = o[p + '_share_ant'] !== 0 ? (o[p + '_share_atual'] - o[p + '_share_ant']) / o[p + '_share_ant'] : null;
+      }
+    });
+
+    // 2) Lucratividade por mês: Σlucro / Σvenda líquida (ponderada, igual à oficial).
+    activeMeses.forEach(m => {
+      let lucro = 0, venda = 0, supytd = 0, hL = false, hV = false, hS = false;
+      setores.forEach(s => {
+        if (s['lucro_' + m] != null) { lucro += s['lucro_' + m]; hL = true; }
+        if (s['venda_ytd_' + m] != null) { venda += s['venda_ytd_' + m]; hV = true; }
+        if (s['sup_ytd_' + m] != null) { supytd += s['sup_ytd_' + m]; hS = true; }
+      });
+      if (hL) o['lucro_' + m] = lucro;
+      if (hV) o['venda_ytd_' + m] = venda;
+      if (hS) o['sup_ytd_' + m] = supytd;
+      o['luc_' + m] = (hV && venda !== 0) ? lucro / venda : null;
+    });
+
+    // 3) PPP atual (base de venda média): soma ytd_sup_atual.
+    let ppp = 0, hP = false;
+    setores.forEach(s => { if (s.ytd_sup_atual != null) { ppp += s.ytd_sup_atual; hP = true; } });
+    if (hP) o.ytd_sup_atual = ppp;
+    o.venda_media = (hP && activeMeses.length) ? ppp / activeMeses.length : null;
+
+    // 4) MC% agregada = média ponderada pela venda líquida (= 1 − Σdespvar/Σvenda).
+    let mcNum = 0, mcDen = 0;
+    setores.forEach(s => { const v = s['venda_ytd_' + lastM]; if (s.mc_pct != null && v != null && v > 0) { mcNum += s.mc_pct * v; mcDen += v; } });
+    o.mc_pct = mcDen > 0 ? mcNum / mcDen : null;
+
+    // 5) Equilíbrio agregado: soma o break-even de cada setor (alvo, atual, líquido).
+    let curMes = 0, alvoMes = 0, alvoLiq = 0, anyBE = false; const bases = new Set();
+    setores.forEach(s => {
+      const b = tendBE(s);
+      if (b) { curMes += b.curMes; alvoMes += b.alvoMes; alvoLiq += b.alvoLiq; anyBE = true; if (b.base) bases.add(b.base); }
+    });
+    o._be = anyBE ? {
+      curMes, alvoMes, gap: alvoMes - curMes, alvoLiq,
+      lucPct: o['luc_' + lastM] != null ? o['luc_' + lastM] * 100 : null,
+      folga: alvoMes > 0 ? ((curMes - alvoMes) / alvoMes) * 100 : null,
+      base: bases.size === 1 ? [...bases][0] : (bases.size ? 'mix' : null), fallback: false, lastM
+    } : null;
+    o.folga_pe = o._be ? o._be.folga : null;
+
+    out.push(o);
+  });
+  return out;
+}
+// Itens da visão atual: setores (PV) ou distritais (GD).
+function tendItems() { return tendNivel === 'gd' ? _tendGD : SETORES; }
+function tendSetNivel(v) { tendNivel = (v === 'gd') ? 'gd' : 'setor'; renderTend(); }
+
+
 function momLadder(o) {
   const W = 120, H = 46, pad = 3, rowH = 12, gap = 2, cx = W / 2;
   if (o.cat === 'insuf') return `<svg width="${W}" height="${H}"></svg>`;
@@ -3135,7 +3229,7 @@ function tendPass(s) {
 }
 function tendFilteredList() {
   const list = [];
-  SETORES.forEach(s => { if (!tendPass(s)) return; if (!tendFaixaPass(s)) return; const o = tendBuild(s); if (tendBucket && o.m.cat !== tendBucket) return; list.push(o); });
+  tendItems().forEach(s => { if (!tendPass(s)) return; if (!tendFaixaPass(s)) return; const o = tendBuild(s); if (tendBucket && o.m.cat !== tendBucket) return; list.push(o); });
   const momOrd = { critico: 0, queda: 1, perde: 2, estagnado: 3, estavel: 4, recupera: 5, acelera: 6, insuf: 7 };
   if (tendSort === 'gap') list.sort((a, b) => (b.be?.gap ?? -1e12) - (a.be?.gap ?? -1e12));   // precisa mais primeiro
   else if (tendSort === 'tri') list.sort((a, b) => (b.m.tri ?? -1e9) - (a.m.tri ?? -1e9));
@@ -3147,8 +3241,9 @@ function tendFilteredList() {
 function renderTend() {
   const grid = document.getElementById('tend-grid'), sum = document.getElementById('tend-summary');
   if (!SETORES.length) { grid.innerHTML = ''; sum.innerHTML = '<div class="tend-empty">Carregue as planilhas para ver a análise.</div>'; return; }
+  _tendGD = (tendNivel === 'gd') ? tendDistritais() : [];   // congela a agregação deste render
   const counts = { acelera: 0, recupera: 0, estavel: 0, estagnado: 0, perde: 0, queda: 0, critico: 0, insuf: 0 };
-  SETORES.forEach(s => { if (!tendPass(s)) return; if (!tendFaixaPass(s)) return; counts[tendMom(s).cat]++; });
+  tendItems().forEach(s => { if (!tendPass(s)) return; if (!tendFaixaPass(s)) return; counts[tendMom(s).cat]++; });
   const order = ['acelera', 'recupera', 'estavel', 'estagnado', 'perde', 'queda', 'critico'];
   if (counts.insuf > 0) order.push('insuf');
   const totalTodos = Object.values(counts).reduce((a, b) => a + b, 0);
@@ -3169,12 +3264,14 @@ function renderTend() {
   sum.innerHTML = warn + sum.innerHTML;
 
   const list = tendFilteredList();
-  document.getElementById('tend-count').textContent = `${list.length} setor${list.length === 1 ? '' : 'es'}`;
+  const noun = tendNivel === 'gd' ? 'distrital' : 'setor';
+  const nounPl = tendNivel === 'gd' ? 'distritais' : 'setores';
+  document.getElementById('tend-count').textContent = `${list.length} ${list.length === 1 ? noun : nounPl}`;
 
   // Tabela de faixas (%) — reflete escopo + bucket de momentum, MENOS o filtro de faixa
   renderTendFaixas();
 
-  if (!list.length) { grid.innerHTML = '<div class="tend-empty">Nenhum setor para este filtro.</div>'; return; }
+  if (!list.length) { grid.innerHTML = `<div class="tend-empty">Nenhum ${noun} para este filtro.</div>`; return; }
   grid.innerHTML = list.map(o => {
     const m = MOM[o.m.cat]; const be = o.be;
     const gapTxt = be ? (be.gap > 0 ? `<span style="color:var(--red)">Falta ${tBRL(be.gap)}/mês</span>` : `<span style="color:var(--green)">Folga ${tBRL(-be.gap)}/mês</span>`) : '';
@@ -3205,7 +3302,7 @@ function renderTendFaixas() {
   if (!bar) return;
 
   const cnt = { f1: 0, f2: 0, f3: 0, f4: 0, neg: 0 };
-  SETORES.forEach(s => {
+  tendItems().forEach(s => {
     if (!tendPass(s)) return;                       // escopo: reg/dist/linha/busca
     if (tendBucket && tendMom(s).cat !== tendBucket) return; // respeita o bucket de momentum
     const f = tendFaixaOf(s);                        // mas NÃO o filtro de faixa
@@ -3224,6 +3321,8 @@ function renderTendFaixas() {
     </div>`;
 
   bar.innerHTML =
+    chip('', 'Todos', ttGeral, pct(ttGeral, ttGeral), 'tfx-todos') +
+    `<span class="tfx-div"></span>` +
     chip('f1', '0,1–5%', cnt.f1, pct(cnt.f1, ttPos), 'tfx-f1') +
     chip('f2', '5–10%', cnt.f2, pct(cnt.f2, ttPos), 'tfx-f2') +
     chip('f3', '10,1–13,3%', cnt.f3, pct(cnt.f3, ttPos), 'tfx-f3') +
@@ -3284,12 +3383,13 @@ function tendVerdict(m, be) {
   return txt + beTxt + compTxt;
 }
 function tendOpenDetail(code) {
-  const s = SETORES.find(x => x.code === code); if (!s) return;
+  const s = tendItems().find(x => x.code === code); if (!s) return;
   const m = tendMom(s), be = tendBE(s), meta = MOM[m.cat];
+  const nivelTxt = s._isGD ? `Distrital ${s.code} · ${s.regional_nome || s.regional} · ${s._nSetores} ${s._nSetores === 1 ? 'setor' : 'setores'}` : `Setor ${s.code} · ${s.regional_nome || s.regional} / ${s.distrital_nome || s.distrital}`;
   document.getElementById('tend-detail-body').innerHTML = `
     <div class="td-head">
       <div><div class="td-nome">${s.nome || ''}</div>
-        <div class="td-meta">Setor ${s.code} · ${s.regional_nome || s.regional} / ${s.distrital_nome || s.distrital} ${s.linha ? `· <span class="linha-badge lb-${(s.linha || '').toLowerCase()}">${s.linha}</span>` : ''}</div></div>
+        <div class="td-meta">${nivelTxt} ${s.linha ? `· <span class="linha-badge lb-${(s.linha || '').toLowerCase()}">${s.linha}</span>` : ''}</div></div>
       <span class="tend-chip" style="color:${meta.color};border-color:${meta.color};font-size:13px;padding:5px 12px">${meta.lbl}</span>
     </div>
     <div class="td-kpis">
