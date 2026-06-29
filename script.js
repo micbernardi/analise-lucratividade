@@ -652,6 +652,13 @@ function addFiles(files, type) {
   }
   renderFileList(type);
   updateProcessBtn();
+  // Zera o value do <input type="file"> depois de capturar os arquivos. Sem isso o
+  // navegador não dispara onchange ao reselecionar o MESMO arquivo (caso típico de
+  // "Limpar dados salvos" e subir as mesmas planilhas de novo), e o upload falha em
+  // silêncio. Os objetos File já foram copiados para pendingLuc/pendingDesemp, então
+  // limpar o input aqui é seguro e não afeta a lista nem o processamento.
+  const inp = document.getElementById(type + '-input');
+  if (inp) inp.value = '';
 }
 
 function renderFileList(type) {
