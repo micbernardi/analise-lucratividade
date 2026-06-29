@@ -152,10 +152,16 @@ function loadDataset(parsed) {
   T_CRIT_INFO = parsed.t_crit || T_CRIT_INFO || null;
   activeMeses = parsed.meses || ['JAN', 'FEV', 'MAR', 'ABR'];
   // Ano do cabeçalho: usa o ano dos nomes das planilhas se houver um único; senão mantém o atual.
-  {
-    const yrs = [...new Set(((parsed.sourceFiles || []).join(' ').match(/\b20\d{2}\b/g)) || [])];
+  // sourceFiles é { luc:[...], desemp:[...] }, mas tratamos também array/string por segurança.
+  try {
+    const sf = parsed.sourceFiles;
+    let names = [];
+    if (Array.isArray(sf)) names = sf;
+    else if (sf && typeof sf === 'object') names = [].concat(sf.luc || [], sf.desemp || []);
+    else if (typeof sf === 'string') names = [sf];
+    const yrs = [...new Set((names.join(' ').match(/\b20\d{2}\b/g)) || [])];
     if (yrs.length === 1) PERIODO_ANO = yrs[0];
-  }
+  } catch (e) { /* mantém o ano padrão */ }
   viewM = activeMeses[activeMeses.length - 1]; // default to latest month
 
   if (!SETORES.length) { showNoData(); return; }
